@@ -1,0 +1,16 @@
+{
+    "name": "YARG.Multiplayer.Core",
+    "rootNamespace": "YARG.Multiplayer",
+    "references": [
+        "YARG.Core.Package"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": true
+}
