@@ -265,7 +265,9 @@ namespace YARG.Multiplayer.Transport
         {
             if (connection.TryClose(false))
             {
-                _connections.TryRemove(new KeyValuePair<int, Connection>(connection.PeerId, connection));
+                // Only removes this exact connection; netstandard2.1 lacks the TryRemove(KeyValuePair) overload
+                ((ICollection<KeyValuePair<int, Connection>>) _connections).Remove(
+                    new KeyValuePair<int, Connection>(connection.PeerId, connection));
                 if (!_disposed)
                 {
                     _events.Enqueue(NetEvent.Disconnected(connection.PeerId, reason));
