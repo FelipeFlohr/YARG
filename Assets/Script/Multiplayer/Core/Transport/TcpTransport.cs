@@ -21,6 +21,7 @@ namespace YARG.Multiplayer.Transport
             public readonly int                         PeerId;
             public readonly BlockingCollection<byte[]>  Outgoing = new();
             public          TcpClient?                  Client;
+            public          long                        PendingBytes;
             private         int                         _closed;
 
             public Connection(int peerId)
@@ -28,17 +29,23 @@ namespace YARG.Multiplayer.Transport
                 PeerId = peerId;
             }
 
+            public bool IsClosed => Volatile.Read(ref _closed) != 0;
+
             /// <summary>
             /// Returns true only for the first call, so each peer gets exactly one disconnect event.
+            /// A graceful close lets the writer thread send what's queued and close the socket itself.
             /// </summary>
-            public bool TryClose()
+            public bool TryClose(bool graceful)
             {
                 if (Interlocked.Exchange(ref _closed, 1) != 0)
                 {
                     return false;
                 }
                 Outgoing.CompleteAdding();
-                Client?.Close();
+                if (!graceful)
+                {
+                    Client?.Close();
+                }
                 return true;
             }
         }
@@ -82,10 +89,17 @@ namespace YARG.Multiplayer.Transport
                 catch (Exception e) when (e is SocketException || e is IOException || e is ArgumentException)
                 {
                     client.Close();
-                    if (connection.TryClose())
+                    if (connection.TryClose(false))
                     {
                         _events.Enqueue(NetEvent.Disconnected(HOST_PEER_ID, $"could not connect: {e.Message}"));
                     }
+                    return;
+                }
+
+                // Disconnected or disposed while connecting
+                if (connection.IsClosed)
+                {
+                    client.Close();
                     return;
                 }
 
@@ -103,20 +117,30 @@ namespace YARG.Multiplayer.Transport
 
             if (_connections.TryGetValue(peerId, out var connection) && !connection.Outgoing.IsAddingCompleted)
             {
+                var framed = MessageFramer.Frame(message);
+                Interlocked.Add(ref connection.PendingBytes, framed.Length);
                 try
                 {
-                    connection.Outgoing.Add(MessageFramer.Frame(message));
+                    connection.Outgoing.Add(framed);
                 }
                 catch (InvalidOperationException)
                 {
                     // Closed concurrently; the disconnect event is already queued
+                    Interlocked.Add(ref connection.PendingBytes, -framed.Length);
                 }
             }
         }
 
+        public long PendingSendBytes(int peerId)
+        {
+            return _connections.TryGetValue(peerId, out var connection)
+                ? Interlocked.Read(ref connection.PendingBytes)
+                : 0;
+        }
+
         public void Disconnect(int peerId)
         {
-            if (_connections.TryRemove(peerId, out var connection) && connection.TryClose())
+            if (_connections.TryRemove(peerId, out var connection) && connection.TryClose(true))
             {
                 _events.Enqueue(NetEvent.Disconnected(peerId, "disconnected locally"));
             }
@@ -136,7 +160,7 @@ namespace YARG.Multiplayer.Transport
             _listener?.Stop();
             foreach (var connection in _connections.Values)
             {
-                connection.TryClose();
+                connection.TryClose(false);
             }
             _connections.Clear();
         }
@@ -170,7 +194,7 @@ namespace YARG.Multiplayer.Transport
         {
             if (_disposed)
             {
-                connection.TryClose();
+                connection.TryClose(false);
                 return;
             }
 
@@ -224,7 +248,11 @@ namespace YARG.Multiplayer.Transport
                 foreach (var framed in connection.Outgoing.GetConsumingEnumerable())
                 {
                     stream.Write(framed, 0, framed.Length);
+                    Interlocked.Add(ref connection.PendingBytes, -framed.Length);
                 }
+
+                // Queue drained after a graceful close; closing also stops the reader
+                connection.Client.Close();
             }
             catch (Exception e) when (e is IOException || e is SocketException || e is ObjectDisposedException ||
                 e is InvalidOperationException)
@@ -235,7 +263,7 @@ namespace YARG.Multiplayer.Transport
 
         private void Close(Connection connection, string reason)
         {
-            if (connection.TryClose())
+            if (connection.TryClose(false))
             {
                 _connections.TryRemove(new KeyValuePair<int, Connection>(connection.PeerId, connection));
                 if (!_disposed)

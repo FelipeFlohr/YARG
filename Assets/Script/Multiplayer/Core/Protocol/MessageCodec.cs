@@ -4,6 +4,7 @@ using System.Text;
 using YARG.Core;
 using YARG.Core.Input;
 using YARG.Core.Song;
+using YARG.Multiplayer.Session;
 
 namespace YARG.Multiplayer.Protocol
 {
@@ -51,6 +52,7 @@ namespace YARG.Multiplayer.Protocol
                     {
                         WriteSongOffer(writer, m.Offer);
                     }
+                    writer.Write((byte) m.State);
                     break;
                 case SetPart m:
                     writer.Write((byte) m.Instrument);
@@ -178,7 +180,7 @@ namespace YARG.Multiplayer.Protocol
                         players[i] = ReadLobbyPlayer(reader);
                     }
                     var offer = reader.ReadBoolean() ? ReadSongOffer(reader) : null;
-                    return new LobbyState(players, offer);
+                    return new LobbyState(players, offer, ReadEnum<SessionState>(reader));
                 }
                 case MessageType.SetPart:
                     return new SetPart(ReadEnum<Instrument>(reader), ReadEnum<Difficulty>(reader));

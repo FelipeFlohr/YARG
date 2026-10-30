@@ -33,7 +33,14 @@ namespace YARG.Multiplayer.Transport
         void Send(int peerId, byte[] message);
 
         /// <summary>
-        /// Closes the connection to a peer. A disconnect event is still raised for it.
+        /// Bytes queued for a peer that haven't been handed to the network yet (0 for unknown peers).
+        /// Bulk senders use it as backpressure.
+        /// </summary>
+        long PendingSendBytes(int peerId);
+
+        /// <summary>
+        /// Closes the connection to a peer after the messages already queued for it are sent.
+        /// A disconnect event is still raised for it.
         /// </summary>
         void Disconnect(int peerId);
 

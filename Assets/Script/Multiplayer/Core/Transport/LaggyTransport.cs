@@ -34,6 +34,8 @@ namespace YARG.Multiplayer.Transport
 
         public void Send(int peerId, byte[] message) => _inner.Send(peerId, message);
 
+        public long PendingSendBytes(int peerId) => _inner.PendingSendBytes(peerId);
+
         public void Disconnect(int peerId) => _inner.Disconnect(peerId);
 
         public void Poll(INetEventListener listener)

@@ -12,6 +12,7 @@ using YARG.Core.Input;
 using YARG.Core.Replays;
 using YARG.Core.Song;
 using YARG.Multiplayer.Protocol;
+using YARG.Multiplayer.Session;
 
 namespace YARG.Multiplayer.Tests.Protocol
 {
@@ -31,8 +32,8 @@ namespace YARG.Multiplayer.Tests.Protocol
             {
                 new LobbyPlayer(0, "Host", Instrument.FiveFretGuitar, Difficulty.Expert, LobbyPlayerStatus.HasSong, 100),
                 new LobbyPlayer(2, "Bia", Instrument.ProDrums, Difficulty.Hard, LobbyPlayerStatus.Downloading, 42),
-            }, TestOffer());
-            yield return new LobbyState(Array.Empty<LobbyPlayer>(), null);
+            }, TestOffer(), SessionState.Transferring);
+            yield return new LobbyState(Array.Empty<LobbyPlayer>(), null, SessionState.Lobby);
             yield return new SetPart(Instrument.FiveFretBass, Difficulty.Medium);
             yield return new Ping(12.5);
             yield return new Pong(12.5, 1012.75);
@@ -94,12 +95,13 @@ namespace YARG.Multiplayer.Tests.Protocol
         {
             var player = new LobbyPlayer(1, "Ana", Instrument.Vocals, Difficulty.Easy, LobbyPlayerStatus.Idle, 0);
 
-            var with = (LobbyState) MessageCodec.Decode(MessageCodec.Encode(new LobbyState(new[] { player }, TestOffer())));
+            var with = (LobbyState) MessageCodec.Decode(MessageCodec.Encode(new LobbyState(new[] { player }, TestOffer(), SessionState.Results)));
             Assert.That(with.Offer, Is.Not.Null);
             Assert.That(with.Offer!.Name, Is.EqualTo("Song"));
             Assert.That(with.Players.Single().Name, Is.EqualTo("Ana"));
+            Assert.That(with.State, Is.EqualTo(SessionState.Results));
 
-            var without = (LobbyState) MessageCodec.Decode(MessageCodec.Encode(new LobbyState(new[] { player }, null)));
+            var without = (LobbyState) MessageCodec.Decode(MessageCodec.Encode(new LobbyState(new[] { player }, null, SessionState.Lobby)));
             Assert.That(without.Offer, Is.Null);
             Assert.That(without.Players.Single().Instrument, Is.EqualTo(Instrument.Vocals));
         }
@@ -150,7 +152,7 @@ namespace YARG.Multiplayer.Tests.Protocol
             var players = Enumerable.Range(0, MessageCodec.MaxLobbyPlayers + 1)
                 .Select(i => new LobbyPlayer(i, "P", Instrument.FiveFretGuitar, Difficulty.Expert, LobbyPlayerStatus.Idle, 0))
                 .ToArray();
-            var data = MessageCodec.Encode(new LobbyState(players, null));
+            var data = MessageCodec.Encode(new LobbyState(players, null, SessionState.Lobby));
             Assert.Throws<InvalidDataException>(() => MessageCodec.Decode(data));
         }
 

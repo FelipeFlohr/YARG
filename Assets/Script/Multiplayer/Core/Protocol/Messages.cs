@@ -1,6 +1,7 @@
 using YARG.Core;
 using YARG.Core.Input;
 using YARG.Core.Song;
+using YARG.Multiplayer.Session;
 
 namespace YARG.Multiplayer.Protocol
 {
@@ -57,11 +58,13 @@ namespace YARG.Multiplayer.Protocol
 
         public LobbyPlayer[] Players { get; }
         public SongOffer?    Offer   { get; }
+        public SessionState  State   { get; }
 
-        public LobbyState(LobbyPlayer[] players, SongOffer? offer)
+        public LobbyState(LobbyPlayer[] players, SongOffer? offer, SessionState state)
         {
             Players = players;
             Offer = offer;
+            State = state;
         }
     }
 

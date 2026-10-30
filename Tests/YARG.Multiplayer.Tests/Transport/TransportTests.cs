@@ -102,6 +102,47 @@ namespace YARG.Multiplayer.Tests.Transport
         }
 
         [Test]
+        public void Tcp_DisconnectStillDeliversQueuedMessages()
+        {
+            using var host = new TcpTransport();
+            using var client = new TcpTransport();
+            var hostEvents = new RecordingListener();
+            var clientEvents = new RecordingListener();
+
+            host.StartHost(0);
+            client.Connect("127.0.0.1", host.LocalPort);
+            PollUntil(() => hostEvents.Events.Contains("connected 1"), (host, hostEvents), (client, clientEvents));
+
+            host.Send(1, new byte[] { 7 });
+            host.Disconnect(1);
+
+            PollUntil(() => clientEvents.Disconnects.Count == 1, (host, hostEvents), (client, clientEvents));
+            Assert.That(clientEvents.Messages.Select(m => m.Message), Is.EqualTo(new[] { new byte[] { 7 } }));
+            Assert.That(hostEvents.Disconnects, Is.EqualTo(new[] { (1, "disconnected locally") }));
+        }
+
+        [Test]
+        public void Tcp_PendingSendBytesDrainsToZero()
+        {
+            using var host = new TcpTransport();
+            using var client = new TcpTransport();
+            var hostEvents = new RecordingListener();
+            var clientEvents = new RecordingListener();
+
+            host.StartHost(0);
+            client.Connect("127.0.0.1", host.LocalPort);
+            for (int i = 0; i < 20; i++)
+            {
+                client.Send(0, new byte[60 * 1024]);
+            }
+            Assert.That(client.PendingSendBytes(0), Is.GreaterThan(0));
+
+            PollUntil(() => hostEvents.Messages.Count == 20, (host, hostEvents), (client, clientEvents));
+            PollUntil(() => client.PendingSendBytes(0) == 0, (client, clientEvents));
+            Assert.That(client.PendingSendBytes(5), Is.EqualTo(0));
+        }
+
+        [Test]
         public void Tcp_ClientDisconnectRaisesPeerDisconnected()
         {
             using var host = new TcpTransport();
