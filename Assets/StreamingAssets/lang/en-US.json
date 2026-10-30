@@ -289,6 +289,39 @@
             "Analyze": "Analyze",
             "PlayWithReplay": "Play With Replay"
         },
+        "Multiplayer": {
+            "Title": "Online Multiplayer",
+            "Host": "Host",
+            "Join": "Join",
+            "JoinPrompt": "Host address (IP or IP:port)",
+            "Lobby": "Lobby",
+            "ChooseSong": "Choose Song",
+            "Start": "Start",
+            "Leave": "Leave",
+            "ChoosePart": "Choose Your Part",
+            "NotReady": "Not everyone is ready yet.",
+            "OnePlayerOnly": "Online multiplayer supports one active player per computer. Sit out the other profiles first.",
+            "NoActivePlayer": "Add or activate a profile before playing online.",
+            "HostFailed": "Could not start hosting: {0}",
+            "InvalidAddress": "Invalid address. Use an IP, or IP:port.",
+            "PackageFailed": "Could not prepare the song for sending: {0}",
+            "UnsupportedSongType": "CON songs can't be shared online. Pick an ini folder or .sng song.",
+            "SessionEnded": "Multiplayer session ended: {0}",
+            "SittingOutSong": "You don't have this song, so you are sitting this one out.",
+            "SongMissing": "The song to play is missing from your library.",
+            "PressAgainToLeave": "Press pause again to leave the match.",
+            "Status": {
+                "Idle": "Waiting",
+                "MissingSong": "Missing song",
+                "Downloading": "Downloading",
+                "HasSong": "Ready",
+                "SongFailed": "Download failed",
+                "Loaded": "Loaded",
+                "Playing": "Playing",
+                "Finished": "Finished",
+                "Left": "Left"
+            }
+        },
         "Main": {
             "MessageOfTheDay": "<align=center><size=32><b>Welcome to v0.15!</b></size></align>\n\nv0.15 is a major update that adds many highly requested and necessary gameplay features such as roll/trill lanes and Big \"YARG\" endings, as well as revamped user interface in the song selection and results screen, drum lane customization, automatic genre categorization, experimental custom vocalist characters in venues, and more.\n\n<b>If you have any feedback or find any bugs, please let us know on Discord or GitHub.</b>\n\nHappy YARGin'!",
             "Options": {
@@ -931,6 +964,7 @@
             "Experimental": "Experimental"
         },
         "Header": {
+            "Multiplayer": "Multiplayer",
             "Other": "Other",
             "Display": "Display",
             "Volume": "Volume",
@@ -965,6 +999,7 @@
             "Accessibility": "Accessibility"
         },
         "Button": {
+            "ChooseMultiplayerSongsFolder": "Choose Downloaded Songs Folder",
             "CopyCurrentSongJsonFilePath": "Copy Current Song Json File Path",
             "CopyCurrentSongTextFilePath": "Copy Current Song Text File Path",
             "ExportSongsJson": "Ouvert (JSON)",
@@ -978,6 +1013,14 @@
             "OpenPersistentDataPath": "Open Persistent Data Path"
         },
         "Setting": {
+            "SaveMultiplayerSongs": {
+                "Name": "Save Downloaded Songs",
+                "Description": "Keeps songs downloaded from an online multiplayer host in your library. When off, they are deleted when you leave the session."
+            },
+            "MultiplayerRemoteDelayMs": {
+                "Name": "Remote Track Delay (ms)",
+                "Description": "How far behind the other players' tracks are shown in online multiplayer. Higher values hide more network lag."
+            },
             "AllowDuplicateSongs": {
                 "Name": "Allow Duplicate Songs",
                 "Description": "Allows duplicate songs to be scanned and displayed in the library. <color=white>Rescan required if changed!</color>"

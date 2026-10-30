@@ -18,6 +18,7 @@ using YARG.Menu.History;
 using YARG.Menu.MusicLibrary;
 using YARG.Menu.Persistent;
 using YARG.Menu.Settings;
+using YARG.Multiplayer;
 using YARG.Playback;
 using YARG.Player;
 using YARG.Scores;
@@ -62,6 +63,9 @@ namespace YARG.Settings
             #region Hidden Settings
 
             public List<string> SongFolders = new();
+
+            // Empty means the default, see MultiplayerSongLibrary.DownloadRoot
+            public string MultiplayerSongsFolder = string.Empty;
 
             public bool ShowAntiPiracyDialog = true;
             public bool ShowEngineInconsistencyDialog = true;
@@ -109,6 +113,18 @@ namespace YARG.Settings
             public void OpenVenueFolder()
             {
                 FileExplorerHelper.OpenFolder(VenueLoader.VenueFolder);
+            }
+
+            public ToggleSetting SaveMultiplayerSongs { get; } = new(true);
+            public IntSetting MultiplayerRemoteDelayMs { get; } = new(200, 50, 1000);
+
+            public void ChooseMultiplayerSongsFolder()
+            {
+                FileExplorerHelper.OpenChooseFolder(MultiplayerSongLibrary.DownloadRoot, folder =>
+                {
+                    MultiplayerSongsFolder = folder;
+                    SaveSettings();
+                });
             }
 
             public DropdownSetting<NoFailMode> NoFail { get; } = new(NoFailMode.Off)

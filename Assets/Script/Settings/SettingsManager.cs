@@ -70,6 +70,11 @@ namespace YARG.Settings
                 nameof(Settings.WrapAroundNavigation),
                 nameof(Settings.DiscordRichPresence),
                 new FieldMetadata(nameof(Settings.AmIAwesome), isAdvanced: true),
+
+                new HeaderMetadata("Multiplayer"),
+                nameof(Settings.SaveMultiplayerSongs),
+                new ButtonRowMetadata(nameof(Settings.ChooseMultiplayerSongsFolder)),
+                new FieldMetadata(nameof(Settings.MultiplayerRemoteDelayMs), isAdvanced: true),
             },
             new SongManagerTab("SongManager", icon: "Songs")
             {

@@ -278,6 +278,39 @@
             "Analyze": "Analisar",
             "PlayWithReplay": "Jogar com Replay"
         },
+        "Multiplayer": {
+            "Title": "Multiplayer Online",
+            "Host": "Hospedar",
+            "Join": "Entrar",
+            "JoinPrompt": "Endereço do host (IP ou IP:porta)",
+            "Lobby": "Lobby",
+            "ChooseSong": "Escolher música",
+            "Start": "Começar",
+            "Leave": "Sair",
+            "ChoosePart": "Escolha sua parte",
+            "NotReady": "Nem todos estão prontos ainda.",
+            "OnePlayerOnly": "O multiplayer online aceita um jogador ativo por computador. Deixe os outros perfis de fora primeiro.",
+            "NoActivePlayer": "Adicione ou ative um perfil antes de jogar online.",
+            "HostFailed": "Não foi possível hospedar: {0}",
+            "InvalidAddress": "Endereço inválido. Use um IP ou IP:porta.",
+            "PackageFailed": "Não foi possível preparar a música para envio: {0}",
+            "UnsupportedSongType": "Músicas CON não podem ser compartilhadas online. Escolha uma música em pasta ini ou .sng.",
+            "SessionEnded": "Sessão multiplayer encerrada: {0}",
+            "SittingOutSong": "Você não tem esta música, então fica de fora desta vez.",
+            "SongMissing": "A música a tocar não está na sua biblioteca.",
+            "PressAgainToLeave": "Aperte pause de novo para sair da partida.",
+            "Status": {
+                "Idle": "Aguardando",
+                "MissingSong": "Sem a música",
+                "Downloading": "Baixando",
+                "HasSong": "Pronto",
+                "SongFailed": "Falha no download",
+                "Loaded": "Carregado",
+                "Playing": "Jogando",
+                "Finished": "Terminou",
+                "Left": "Saiu"
+            }
+        },
         "Main": {
             "MessageOfTheDay": "<align=center><size=32><b>Boas vindas às versões Nightly 0.15!</b></size></align>\n\nA versão 0.15 agora tem suporte às faixas com trêmolo/trill, fundos de faixa personalizáveis (incluindo transparência), personagens de palco personalizáveis, reposicionamento de pistas, novas ferramentas de calibração no jogo e muito mais! E além disso, a nova e melhorada biblioteca de músicas também está disponível e com filtros avançados de música, que te deixa encontrar exatamente o que você quer mesmo em bibliotecas enormes!\n\n<b>Se deseja deixar algum feedback ou encontrar algum erro, avise-nos no Discord ou no GitHub.</b>\n\nFeliz YARG!",
             "Options": {
@@ -920,6 +953,7 @@
             "Experimental": "Experimental"
         },
         "Header": {
+            "Multiplayer": "Multiplayer",
             "Other": "Outros",
             "Display": "Tela",
             "Volume": "Volume",
@@ -954,6 +988,7 @@
             "Accessibility": "Acessibilidade"
         },
         "Button": {
+            "ChooseMultiplayerSongsFolder": "Escolher pasta de músicas baixadas",
             "CopyCurrentSongJsonFilePath": "Copiar Diretório do Arquivo Json da Canção Atual",
             "CopyCurrentSongTextFilePath": "Copiar Diretório do Arquivo de Texto da Canção Atual",
             "ExportSongsJson": "Ouvert (JSON)",
@@ -967,6 +1002,14 @@
             "OpenPersistentDataPath": "Abrir Diretório de Dados Persistentes"
         },
         "Setting": {
+            "SaveMultiplayerSongs": {
+                "Name": "Salvar músicas baixadas",
+                "Description": "Mantém na sua biblioteca as músicas baixadas de um host no multiplayer online. Desligado, elas são apagadas quando você sai da sessão."
+            },
+            "MultiplayerRemoteDelayMs": {
+                "Name": "Atraso das pistas remotas (ms)",
+                "Description": "Quanto atrás as pistas dos outros jogadores aparecem no multiplayer online. Valores maiores escondem mais lag de rede."
+            },
             "AllowDuplicateSongs": {
                 "Name": "Permitir Músicas Duplicadas",
                 "Description": "Permite que músicas duplicadas sejam escaneadas e mostradas na biblioteca. <color=white>Reescaneamento necessário caso seja mudado!</color>"

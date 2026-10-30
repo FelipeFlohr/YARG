@@ -13,6 +13,7 @@ using YARG.Helpers;
 using YARG.Helpers.Extensions;
 using YARG.Localization;
 using YARG.Menu.MusicLibrary;
+using YARG.Multiplayer;
 using YARG.Player;
 using YARG.Scores;
 using YARG.Settings;
@@ -146,6 +147,14 @@ namespace YARG.Song
             if (!string.IsNullOrEmpty(setlistPath) && !directories.Contains(setlistPath))
             {
                 directories.Add(setlistPath);
+            }
+
+            foreach (string multiplayerPath in MultiplayerSongLibrary.ExtraScanDirectories)
+            {
+                if (!directories.Contains(multiplayerPath))
+                {
+                    directories.Add(multiplayerPath);
+                }
             }
 
             var stopwatch = System.Diagnostics.Stopwatch.StartNew();
