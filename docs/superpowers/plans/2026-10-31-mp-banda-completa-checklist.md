@@ -94,7 +94,7 @@ O verificador compara todas as linhas `Result:` (pontuação, acertos/total) e `
 
 | O que | Causa | Correção | Commit |
 |---|---|---|---|
-| Harness frágil (contêiner órfão, processo preso) | `timeout` sem `-k`, sem `--init`, sem limpar contêiner antigo | `timeout -k 30`, `--init`, `docker rm -f`; matar as outras instâncias se uma sair com erro; verificador exige que o 1º mute caia dentro da janela (+ teste); `.gitignore` | `5a560b6` |
+| Harness frágil (contêiner órfão, processo preso) | `timeout` sem `-k`, sem `--init`, sem limpar contêiner antigo | `timeout -k 30`, `--init`, `docker rm -f`; matar as outras instâncias se uma sair com erro; verificador exige que o 1º mute caia dentro da janela (+ teste); `.gitignore` | `b5a560b6` |
 | Cliente caía da sessão ("connection to the host timed out") | Carregar a música bloqueia a thread principal por mais que o timeout padrão de 5 s | `timeoutSeconds: 30` na `SessionConfig` do jogo | `c1352998` |
 | Clientes depois do primeiro recusados (`SessionInProgress`) | O host do autotest começava a rodada com o primeiro cliente | Argumento `-mp-players N` (padrão 2), o harness passa o número de instâncias | `032fc098` |
 | `band4`: bass tocava sozinho ("Player N didn't load in time") | `MULTIPLAYER_SETUP_TIMEOUT` de 15 s menor que o carregamento de 4 instâncias nesta máquina | 60 s (igual ao de início) | `f651f349` |
