@@ -12,6 +12,9 @@ namespace YARG.Helpers
     {
         private static readonly Regex _fileNameSanitize = new("([^a-zA-Z0-9])", RegexOptions.Compiled);
 
+        private const string WEB_PERSISTENT_DATA_PATH = "/tmp/yarg";
+        private const string WEB_STREAMING_ASSETS_PATH = "/streaming";
+
         /// <summary>
         /// Where settings, scores, etc. should be stored.
         /// </summary>
@@ -105,8 +108,22 @@ namespace YARG.Helpers
             PersistentDataPath = SanitizePath(Path.Combine(Application.persistentDataPath, "release"));
 #endif
 
+            if (PlatformInfo.IsWeb)
+            {
+                // The web build runs on the in-memory file system, and the CLI override does not apply
+                PersistentDataPath = RealPersistentDataPath = WEB_PERSISTENT_DATA_PATH;
+                try
+                {
+                    Directory.CreateDirectory(PersistentDataPath);
+                }
+                catch (IOException e)
+                {
+                    Debug.LogException(e);
+                    PathError = true;
+                }
+            }
             // Persistent Data Path override passed in from CLI
-            if (!string.IsNullOrWhiteSpace(CommandLineArgs.PersistentDataPath))
+            else if (!string.IsNullOrWhiteSpace(CommandLineArgs.PersistentDataPath))
             {
                 try
                 {
@@ -125,8 +142,16 @@ namespace YARG.Helpers
 
             // Get other paths that are only allowed on the main thread
             ApplicationDataPath = SanitizePath(Application.dataPath);
-            ExecutablePath = Directory.GetParent(ApplicationDataPath)?.FullName;
-            StreamingAssetsPath = SanitizePath(Application.streamingAssetsPath);
+            if (PlatformInfo.IsWeb)
+            {
+                // The application data path is a URL on the web, so there is no executable folder
+                StreamingAssetsPath = WEB_STREAMING_ASSETS_PATH;
+            }
+            else
+            {
+                ExecutablePath = Directory.GetParent(ApplicationDataPath)?.FullName;
+                StreamingAssetsPath = SanitizePath(Application.streamingAssetsPath);
+            }
 
             // Get song scanning paths
             SongCachePath = Path.Combine(PersistentDataPath, "songcache.bin");

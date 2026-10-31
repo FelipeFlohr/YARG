@@ -125,7 +125,7 @@ namespace YARG.Helpers.Extensions
             state.RequestId++;
             state.SongEntry = songEntry;
             var requestId = state.RequestId;
-            using var image = await UniTask.RunOnThreadPool(songEntry.LoadAlbumData);
+            using var image = await PlatformTask.Run(songEntry.LoadAlbumData);
             // Everything that happens after this conditional should only happen *once*
             // There's no reason to create and destroy texture objects if they're just gonna be overriden
             if (!_currentByImage.TryGetValue(instanceId, out state) || state.RequestId != requestId || state.SongEntry != songEntry)

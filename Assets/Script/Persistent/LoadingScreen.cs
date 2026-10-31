@@ -90,7 +90,7 @@ namespace YARG
             else
             {
                 var dictText = cmudictAsset.text;
-                await UniTask.RunOnThreadPool(() =>
+                await PlatformTask.Run(() =>
                 {
                     YARG.Core.Chart.LipsyncGenerator.Initialize(dictText);
                     YargLogger.LogInfo("Initialized phoneme dictionary");

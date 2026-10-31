@@ -7,6 +7,7 @@ using YARG.Core;
 using YARG.Core.Extensions;
 using YARG.Helpers.Extensions;
 using YARG.Core.Logging;
+using YARG.Helpers;
 using YARG.Core.Audio;
 using YARG.Core.Game;
 using YARG.Core.Song;
@@ -40,7 +41,7 @@ namespace YARG.Multiplayer
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void Bootstrap()
         {
-            var args = Environment.GetCommandLineArgs();
+            var args = PlatformInfo.GetArgs();
             int index = Array.IndexOf(args, "-mp-autotest");
             if (index < 0 || index + 1 >= args.Length)
             {

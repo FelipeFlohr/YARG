@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Linq;
 using UnityEngine;
+using YARG.Helpers;
 
 namespace YARG
 {
@@ -47,7 +48,7 @@ namespace YARG
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSplashScreen)]
         private static void InitCommandLineArgs()
         {
-            var args = Environment.GetCommandLineArgs();
+            var args = PlatformInfo.GetArgs();
 
             // Remember, the first argument is always the application itself
             for (int i = 1; i < args.Length; i++)

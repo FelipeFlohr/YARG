@@ -125,6 +125,12 @@ namespace YARG
         {
             GlobalAudioHandler.Update();
 
+            // Without a logger thread (web), the queue is drained here
+            if (!YargLogger.HasOutputThread)
+            {
+                YargLogger.FlushLogQueue();
+            }
+
 #if UNITY_EDITOR
             bool muted = UnityEditor.EditorUtility.audioMasterMute;
             if (muted != _previousMute)
