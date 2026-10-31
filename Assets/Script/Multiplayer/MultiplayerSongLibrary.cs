@@ -78,13 +78,25 @@ namespace YARG.Multiplayer
 #nullable enable
         public static SongEntry? FindByHash(HashWrapper hash)
         {
-            if (SongContainer.SongsByHash.TryGetValue(hash, out var songs) && songs.Count > 0)
+            // The cache keeps listing songs whose files were deleted (temp downloads are) until a
+            // full rescan, and claiming one of those would make loading fail mid-match
+            if (SongContainer.SongsByHash.TryGetValue(hash, out var songs))
             {
-                return songs[0];
+                var found = songs.FirstOrDefault(IsOnDisk);
+                if (found != null)
+                {
+                    return found;
+                }
             }
 
             // Also songs hidden by filters such as the max rating: the player still has them
-            return SongContainer.UnfilteredSongs.FirstOrDefault(song => song.Hash.Equals(hash));
+            return SongContainer.UnfilteredSongs.FirstOrDefault(song => song.Hash.Equals(hash) && IsOnDisk(song));
+        }
+
+        private static bool IsOnDisk(SongEntry song)
+        {
+            string location = song.ActualLocation;
+            return File.Exists(location) || Directory.Exists(location);
         }
 
         /// <summary>

@@ -582,7 +582,10 @@ namespace YARG.Gameplay
                 player.RefreshPresets();
             }
 
-            var lastHighScore = ScoreContainer.GetHighScore(Song.Hash, player.Profile.Id, player.Profile.CurrentInstrument, false)?.Score;
+            // A remote player's profile and scores only exist on their own machine
+            var lastHighScore = player.IsRemote
+                ? null
+                : ScoreContainer.GetHighScore(Song.Hash, player.Profile.Id, player.Profile.CurrentInstrument, false)?.Score;
             YargLogger.LogFormatInfo("Current high score for player {0} on {1}: {2}",
                 player.Profile.Name, player.Profile.CurrentInstrument, lastHighScore ?? 0);
 

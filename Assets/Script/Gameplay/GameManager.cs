@@ -702,7 +702,9 @@ namespace YARG.Gameplay
                 return true;
             }
 
-            if (MultiplayerGameplay.IsInMatch)
+            // EndMultiplayerSong ends the match right after showing the results, and the scene keeps
+            // updating until it unloads: falling through then would show (and record) them twice
+            if (MultiplayerGameplay.IsInMatch || _multiplayerEnding)
             {
                 // Keeps updating the players while waiting, so remote tracks catch up
                 if (!_multiplayerEnding)
@@ -769,7 +771,7 @@ namespace YARG.Gameplay
             {
                 PlayerScores = _players.Select(player => new PlayerScoreCard
                 {
-                    IsHighScore = player.IsActive && player.Score > player.LastHighScore,
+                    IsHighScore = player.IsActive && !player.Player.IsRemote && player.Score > player.LastHighScore,
                     Player = player.Player,
                     Stats = GetResultStats(player),
                     IsReplay = player.Player.IsReplay
