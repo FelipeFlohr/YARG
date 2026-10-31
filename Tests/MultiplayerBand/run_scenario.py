@@ -13,6 +13,7 @@ import sys
 
 import check_band_logs
 import launch_in_container
+import minimize
 from scenarios import SCENARIOS
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -22,6 +23,10 @@ BUILD = os.path.join(HOME, "yarg-build-mp-banda")
 SONGS = os.environ.get("YARG_MP_SONGS", os.path.join(HOME, "repos", "musicas yarg"))
 NATIVE_GAME = os.path.join(BUILD, "YARG.exe" if os.name == "nt" else "YARG.x86_64")
 NATIVE_WINDOW_FLAGS = ["-screen-fullscreen", "0", "-screen-width", "640", "-screen-height", "360"]
+NATIVE_SETTINGS = {
+    "FullscreenMode": 3,  # FullScreenMode.Windowed
+    "PauseOnFocusLoss": False,
+}
 BASE_SETTINGS = {
     "DisablePerSongBackgrounds": True,
     "DisableGlobalBackgrounds": True,
@@ -69,14 +74,25 @@ def run_native(name, run_dir, args):
         return 2
 
     scenario = SCENARIOS[name]
+    settings = dict(NATIVE_SETTINGS)
     # Sound off unless asked for: several instances at once are just noise
-    prepare(name, run_dir, songs=os.path.abspath(args.songs),
-            extra_settings=None if args.audible else {"MasterMusicVolume": 0})
-    return launch_in_container.run_instances(
-        scenario,
-        lambda inst: launch_in_container.command(scenario, inst, game=args.game, work=run_dir,
-                                                 window_flags=NATIVE_WINDOW_FLAGS),
-        args.stagger, host_wait=args.host_wait)
+    if not args.audible:
+        settings["MasterMusicVolume"] = 0
+    prepare(name, run_dir, songs=os.path.abspath(args.songs), extra_settings=settings)
+
+    # Minimized windows by default, so the machine stays usable while a scenario runs
+    minimizer = None if args.show else minimize.Minimizer()
+    try:
+        return launch_in_container.run_instances(
+            scenario,
+            lambda inst: launch_in_container.command(scenario, inst, game=args.game, work=run_dir,
+                                                     window_flags=NATIVE_WINDOW_FLAGS),
+            args.stagger, host_wait=args.host_wait,
+            popen_kwargs=minimizer.popen_kwargs() if minimizer else None,
+            on_started=minimizer.add if minimizer else None)
+    finally:
+        if minimizer:
+            minimizer.stop()
 
 
 def main(argv=None):
@@ -90,6 +106,7 @@ def main(argv=None):
     parser.add_argument("--host-wait", type=float, default=launch_in_container.HOST_WAIT,
                         help="native: seconds between the host and the first client")
     parser.add_argument("--audible", action="store_true", help="native: keep the game's sound on")
+    parser.add_argument("--show", action="store_true", help="native: don't minimize the game windows")
     args = parser.parse_args(argv)
 
     run_dir = os.path.join(RUNS, args.scenario)

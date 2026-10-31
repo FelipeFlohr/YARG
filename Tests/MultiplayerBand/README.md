@@ -58,8 +58,8 @@ Logs and settings go to `~/yarg-mp-banda-runs/<scenario>/<instance>/`; the check
 scripts without `-I` (isolated mode drops the script folder from `sys.path`).
 
 Other scenarios: `same-instrument-both-miss` (two scripted guitarists whose misses overlap from 35 to 40 s),
-`pro-instruments` (pro guitar, pro bass, 4-lane drums), `fail-meter` (`NoFail` off) and `band8` (eight machines).
-No song in the test library has a 6-fret or elite drums chart, so those have no scenario.
+`four-lane` (4-lane and pro drums), `fail-meter` (`NoFail` off) and `band8` (eight machines). No song in the test
+library has a 6-fret or elite drums chart, and pro guitar has no gameplay track in the game, so those have no scenario.
 
 ## Native runs (Windows, no Docker)
 

@@ -28,8 +28,10 @@ def command(scenario, inst, game=GAME, work="/work", window_flags=WINDOW_FLAGS):
     return cmd + inst["args"]
 
 
-def run_instances(scenario, make_command, stagger, env=None, host_wait=HOST_WAIT, total_timeout=TOTAL_TIMEOUT):
-    """Starts the host, then the clients, and waits for all of them. Returns 0 when every instance exited with 0."""
+def run_instances(scenario, make_command, stagger, env=None, host_wait=HOST_WAIT, total_timeout=TOTAL_TIMEOUT,
+                  popen_kwargs=None, on_started=None):
+    """Starts the host, then the clients, and waits for all of them. Returns 0 when every instance exited with 0.
+    popen_kwargs go to every Popen; on_started gets each new process."""
     procs = []
     try:
         for i, inst in enumerate(scenario["instances"]):
@@ -38,7 +40,10 @@ def run_instances(scenario, make_command, stagger, env=None, host_wait=HOST_WAIT
             elif i > 1:
                 time.sleep(stagger)
             print("starting " + inst["name"], flush=True)
-            procs.append((inst["name"], subprocess.Popen(make_command(inst), env=env)))
+            proc = subprocess.Popen(make_command(inst), env=env, **(popen_kwargs or {}))
+            procs.append((inst["name"], proc))
+            if on_started:
+                on_started(proc)
 
         deadline = time.time() + total_timeout
         ok = True

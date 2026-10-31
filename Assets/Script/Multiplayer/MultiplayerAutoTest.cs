@@ -91,6 +91,12 @@ namespace YARG.Multiplayer
                     Log($"FAIL: unknown instrument '{instrument}'");
                     return false;
                 }
+                // The gameplay scene has no pro guitar track, and no profile can pick that game mode
+                if (parsed.ToNativeGameMode() == GameMode.ProGuitar)
+                {
+                    Log($"FAIL: {parsed} can't be played, the game has no pro guitar track");
+                    return false;
+                }
                 _instrument = parsed;
             }
 

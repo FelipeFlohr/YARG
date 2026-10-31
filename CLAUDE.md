@@ -50,6 +50,8 @@ extras (host/join): [-mp-profile nome] [-mp-instrument Instrument] [-mp-difficul
 YARG -persistent-data-path <dados>   -mp-autotest offline <jogadores>
 ```
 
+Os cenários de banda (`Tests/MultiplayerBand`) rodam em Docker ou, no Windows com GPU, direto como processos com `run_scenario.py <cenário> --native` (janelas minimizadas e sem som; ver o `README.md` da pasta).
+
 `-mp-players n` (host, padrão 2) é quantos jogadores o host espera antes de começar a rodada. Os extras escolhem o perfil (achado pelo nome ou criado e salvo), o instrumento e a dificuldade; `-mp-bot` grava `IsBot` no perfil (sem extras o perfil vira bot); `-mp-miss 20-40` joga como humano de guitarra de cinco trastes com um roteiro que erra de propósito entre esses segundos da música. O log traz `Stem <stem> fraction=… song=…` (mudanças de mute) e `Band: score=… stars=… players=…`; instrumento ausente na música dá `FAIL: … not in song`.
 
 ## Arquitetura

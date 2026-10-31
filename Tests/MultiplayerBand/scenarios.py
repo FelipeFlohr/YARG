@@ -50,16 +50,16 @@ SCENARIOS = {
         ],
         "expect": {"muted": {"Guitar": {"from": 35, "to": 40}}, "scripted": ["Guit", "Guit2"]},
     },
-    # Pro guitar and pro bass share the Guitar and Bass stems with nobody, 4-lane drums come from the pro chart.
-    # Subdivisions has no 6-fret or elite drums chart, and no song in the test library does.
-    "pro-instruments": {
+    # 4-lane drums from the pro chart next to pro drums. No song in the test library has a 6-fret or elite drums
+    # chart, and pro guitar has no gameplay track in the game (no profile can pick it), so those have no scenario.
+    "four-lane": {
         "song": "Subdivisions",
         "instances": [
-            _inst("host", "host", "ProGuit", "ProGuitar_17Fret", ["-mp-bot", "1"]),
-            _bot("probass", "ProBass", "ProBass_17Fret"),
+            _inst("host", "host", "Guit", "FiveFretGuitar", ["-mp-miss", "60-70"]),
             _bot("drums4", "Drum4", "FourLaneDrums"),
+            _bot("prodrums", "ProDrum", "ProDrums"),
         ],
-        "expect": {"muted": {}},
+        "expect": {"muted": {"Guitar": {"from": 60, "to": 70}}, "scripted": "Guit"},
     },
     # Fail meter on: ten seconds of misses from one player must not end the song for a band of bots
     "fail-meter": {
@@ -83,7 +83,7 @@ SCENARIOS = {
             _bot("harmony", "Harm", "Harmony"),
             _bot("keys", "Keys", "Keys"),
             _bot("prokeys", "ProKeys", "ProKeys"),
-            _bot("probass", "ProBass", "ProBass_17Fret"),
+            _bot("drums4", "Drum4", "FourLaneDrums"),
         ],
         "expect": {"muted": {"Guitar": {"from": 60, "to": 70}}, "scripted": "Guit"},
     },
