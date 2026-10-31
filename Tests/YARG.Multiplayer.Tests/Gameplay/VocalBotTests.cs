@@ -34,15 +34,15 @@ namespace YARG.Multiplayer.Tests.Gameplay
             Assert.That(hit, Is.EqualTo(total));
         }
 
-        // Documents why the headless band scenarios show the vocal bot at 0/N phrases: the Core's bot only sings on
-        // the updates the game gives it (YARG.Core VocalsEngine.GenerateQueuedUpdates computes the extra bot
-        // updates with `index * ApproximateVocalFps` instead of `index * timeForFrame`, so none are queued).
-        [Test]
-        public void Bot_MissesPhrasesWhenTheGameRunsFarBelowRealFrameRates()
+        // The Core's bot used to sing only on the updates the game gave it, so at a few frames per second (the
+        // headless band scenarios) it hit nothing; the fix queues the extra bot updates itself.
+        [TestCase(10)]
+        [TestCase(1)]
+        public void Bot_HitsEveryPhraseEvenWhenTheGameRunsFarBelowRealFrameRates(double updatesPerSecond)
         {
-            var (hit, total) = PlayBot(1);
+            var (hit, total) = PlayBot(updatesPerSecond);
 
-            Assert.That(hit, Is.LessThan(total));
+            Assert.That(hit, Is.EqualTo(total));
         }
     }
 }
