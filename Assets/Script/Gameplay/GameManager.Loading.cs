@@ -680,7 +680,7 @@ namespace YARG.Gameplay
             if (!hasStem && _stemStates.ContainsKey(_backgroundStem))
             {
                 // Ensures the stem will still play at a minimum of 50%, even if all players mute
-                _stemMutes.AddParticipant(_backgroundStem, _playerIndex, weight: 2);
+                _stemMutes.AddParticipant(_backgroundStem, _playerIndex, weight: 2, mutedWeight: 1);
             }
         }
     }

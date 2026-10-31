@@ -137,5 +137,118 @@ namespace YARG.Multiplayer.Tests.Audio
             Assert.That(t.StemsOf(1), Has.Count.EqualTo(1));
             Assert.That(t.GetAudibleFraction(SongStem.Drums1, StemMuteRule.Proportional), Is.EqualTo(0.75).Within(1e-9));
         }
+
+        [Test]
+        public void MutedWeight_KeepsAFloorWhenMuted()
+        {
+            var t = new StemMuteTracker();
+            t.AddParticipant(SongStem.Song, 1, weight: 2, mutedWeight: 1);
+            t.SetMuted(SongStem.Song, 1, true);
+            Assert.That(t.GetAudibleFraction(SongStem.Song, StemMuteRule.Proportional), Is.EqualTo(0.5));
+        }
+
+        [Test]
+        public void MutedWeight_AllMustMiss_StillSilentWhenEveryoneMuted()
+        {
+            var t = new StemMuteTracker();
+            t.AddParticipant(SongStem.Song, 1, weight: 2, mutedWeight: 1);
+            Assert.That(t.GetAudibleFraction(SongStem.Song, StemMuteRule.AllMustMiss), Is.EqualTo(1.0));
+            t.SetMuted(SongStem.Song, 1, true);
+            Assert.That(t.GetAudibleFraction(SongStem.Song, StemMuteRule.AllMustMiss), Is.EqualTo(0.0));
+        }
+
+        [TestCase(0, 0)]
+        [TestCase(-1, 0)]
+        [TestCase(2, -1)]
+        [TestCase(2, 3)]
+        public void AddParticipant_InvalidWeights_Throw(int weight, int mutedWeight)
+        {
+            var t = new StemMuteTracker();
+            Assert.Throws<System.ArgumentOutOfRangeException>(
+                () => t.AddParticipant(SongStem.Song, 1, weight, mutedWeight));
+        }
+
+        // The single-player StemState/SetMute logic as it was before the tracker existed
+        private sealed class LegacyStemState
+        {
+            public int Total;
+            public int Audible;
+
+            public double SetMute(bool muted, bool keepAudibleUntilAllMiss)
+            {
+                if (muted)
+                {
+                    --Audible;
+                }
+                else if (Audible < Total)
+                {
+                    ++Audible;
+                }
+
+                if (keepAudibleUntilAllMiss)
+                {
+                    return Audible > 0 ? 1 : 0;
+                }
+
+                return (double) Audible / Total;
+            }
+        }
+
+        [TestCase(1, false)]
+        [TestCase(2, false)]
+        [TestCase(3, true)]
+        [TestCase(4, true)]
+        public void ParityWithLegacySingleplayerLogic(int seed, bool allMustMiss)
+        {
+            var rng = new System.Random(seed);
+            for (int round = 0; round < 50; round++)
+            {
+                int players = rng.Next(1, 5);
+                var legacy = new LegacyStemState();
+                var tracker = new StemMuteTracker();
+                var muted = new bool[players];
+                for (int i = 0; i < players; i++)
+                {
+                    // Players without a stem of their own count twice but only mute once
+                    bool background = rng.Next(2) == 0;
+                    legacy.Total += background ? 2 : 1;
+                    if (background)
+                    {
+                        tracker.AddParticipant(SongStem.Song, i, weight: 2, mutedWeight: 1);
+                    }
+                    else
+                    {
+                        tracker.AddParticipant(SongStem.Song, i);
+                    }
+                }
+
+                legacy.Audible = legacy.Total;
+
+                for (int step = 0; step < 200; step++)
+                {
+                    int who = rng.Next(players);
+                    bool mute = !muted[who];
+                    muted[who] = mute;
+
+                    double expected = legacy.SetMute(mute, allMustMiss);
+                    tracker.SetMuted(SongStem.Song, who, mute);
+                    var rule = allMustMiss ? StemMuteRule.AllMustMiss : StemMuteRule.Proportional;
+                    double actual = tracker.GetAudibleFraction(SongStem.Song, rule);
+
+                    if (allMustMiss)
+                    {
+                        // The legacy all-miss path only ever applied to stems with weight-1 players
+                        // here; a background player still holds weight, so compare on "anyone unmuted"
+                        bool anyUnmuted = false;
+                        foreach (bool m in muted) { anyUnmuted |= !m; }
+                        Assert.That(actual, Is.EqualTo(anyUnmuted ? 1.0 : 0.0));
+                    }
+                    else
+                    {
+                        Assert.That(actual, Is.EqualTo(expected).Within(1e-9), $"seed {seed} round {round} step {step}");
+                    }
+                }
+            }
+        }
     }
 }
