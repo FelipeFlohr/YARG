@@ -788,6 +788,23 @@ namespace YARG.Gameplay
                 YargLogger.LogException(e, "Failed to save replay!");
             }
 
+            int bandScore = BandScore;
+            int bandStars = (int) BandStars;
+            if (MultiplayerGameplay.IsInMatch)
+            {
+                // Always from the final stats of each player, so every machine shows the same result
+                var (score, stars) = YARG.Multiplayer.Gameplay.BandResult.Compute(
+                    _players.Select(p =>
+                    {
+                        var s = GetResultStats(p);
+                        return (s.TotalScore, s.BandBonusScore);
+                    }),
+                    EngineManager.StarScoreThresholds);
+                YargLogger.LogFormatInfo("Band result: simulated {0}, authoritative {1}", bandScore, score);
+                bandScore = score;
+                bandStars = stars;
+            }
+
             // Pass the score info to the stats screen
             GlobalVariables.State.ScoreScreenStats = new ScoreScreenStats
             {
@@ -798,8 +815,8 @@ namespace YARG.Gameplay
                     Stats = GetResultStats(player),
                     IsReplay = player.Player.IsReplay
                 }).ToArray(),
-                BandScore = BandScore,
-                BandStars = (int) BandStars,
+                BandScore = bandScore,
+                BandStars = bandStars,
 
                 MeanAverageOffset = ActivePlayers
                     .Where(player => !(player.IsBot || player.Player.IsRemote))
