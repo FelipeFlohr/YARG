@@ -10,6 +10,6 @@ namespace YARG.Multiplayer
         public const long MaxSongBytes = 2L * 1024 * 1024 * 1024;
 
         // Including the host
-        public const int MaxMachines = 4;
+        public const int MaxMachines = 8;
     }
 }

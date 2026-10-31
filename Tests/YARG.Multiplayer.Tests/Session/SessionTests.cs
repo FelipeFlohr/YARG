@@ -162,8 +162,10 @@ namespace YARG.Multiplayer.Tests.Session
         }
 
         [Test]
-        public void Join_RejectsFifthMachine()
+        public void Join_RejectsMachineBeyondTheLimit()
         {
+            Assert.That(ProtocolInfo.MaxMachines, Is.EqualTo(8));
+
             using var h = new Harness();
             for (int i = 0; i < ProtocolInfo.MaxMachines - 1; i++)
             {
