@@ -113,6 +113,19 @@ namespace YARG.Multiplayer.Tests.SongShare
         }
 
         [Test]
+        public void IniFolder_PackageDisposeWhileStreamOpen_DoesNotThrow()
+        {
+            // The host re-offers while a transfer still reads the previous package
+            var song = Dir("source/Song");
+            File.WriteAllBytes(Path.Combine(song, "notes.chart"), new byte[] { 1 });
+            var temp = Dir("temp");
+
+            var package = SongPackager.FromIniFolder(song, temp);
+            using var stream = package.Open();
+            Assert.DoesNotThrow(() => package.Dispose());
+        }
+
+        [Test]
         public void IniFolder_PackageDisposeDeletesTemporaryZip()
         {
             var song = Dir("source/Song");

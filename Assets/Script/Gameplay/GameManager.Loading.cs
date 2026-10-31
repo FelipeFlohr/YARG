@@ -52,6 +52,7 @@ namespace YARG.Gameplay
         private GameObject _proGuitarPrefab;
 
         private const double MULTIPLAYER_SETUP_TIMEOUT = 15;
+        private const double MULTIPLAYER_START_TIMEOUT = 60;
 
         private const double NORMALIZED_SAMPLE_VOLUME_MULTIPLIER = 0.5;
         private const double DEFAULT_SAMPLE_VOLUME_MULTIPLIER = 1.0;
@@ -186,6 +187,7 @@ namespace YARG.Gameplay
                     SettingsMenu.Instance.SelectTabByName("SongManager");
                 });
 
+                LeaveMatchOnLoadFailure();
                 global.LoadScene(SceneIndex.Menu);
                 return;
             }
@@ -195,6 +197,7 @@ namespace YARG.Gameplay
                 YargLogger.LogError(_loadFailureMessage);
                 ToastManager.ToastError(_loadFailureMessage);
 
+                LeaveMatchOnLoadFailure();
                 global.LoadScene(SceneIndex.Menu);
                 return;
             }
@@ -210,7 +213,7 @@ namespace YARG.Gameplay
                 Song.SongOffsetSeconds);
 
             // Spawn players
-            bool multiplayer = MultiplayerManager.IsActive;
+            bool multiplayer = MultiplayerGameplay.IsInMatch;
             if (multiplayer)
             {
                 // The remote players are added once everybody sent their setup
@@ -255,6 +258,7 @@ namespace YARG.Gameplay
             {
                 ToastManager.ToastError(_loadFailureMessage);
 
+                LeaveMatchOnLoadFailure();
                 global.LoadScene(SceneIndex.Menu);
                 return;
             }
@@ -313,9 +317,15 @@ namespace YARG.Gameplay
             if (multiplayer)
             {
                 context.SetLoadingText("Waiting for the song to start...");
-                if (!await MultiplayerGameplay.WaitForStart())
+                if (!await MultiplayerGameplay.WaitForStart(MULTIPLAYER_START_TIMEOUT))
                 {
-                    // The session ended and already sent us back to the menu
+                    // Either the session ended and already sent us back to the menu,
+                    // or someone never finished loading
+                    if (MultiplayerGameplay.IsInMatch)
+                    {
+                        LeaveMatchOnLoadFailure();
+                        global.LoadScene(SceneIndex.Menu);
+                    }
                     return;
                 }
             }
@@ -324,6 +334,18 @@ namespace YARG.Gameplay
             enabled = true;
             IsSongStarted = true;
             _songStarted?.Invoke();
+        }
+
+        /// <summary>
+        /// Leaves the online session when this machine can't play the song, so the
+        /// others don't wait for it forever.
+        /// </summary>
+        private static void LeaveMatchOnLoadFailure()
+        {
+            if (MultiplayerGameplay.IsInMatch)
+            {
+                MultiplayerManager.Instance.Leave();
+            }
         }
 
         private void ApplySampleNormalization()

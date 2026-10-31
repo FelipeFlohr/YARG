@@ -381,7 +381,7 @@ namespace YARG.Gameplay
         public void Pause(bool showMenu = true)
         {
             // Online songs never pause, not even on focus loss or a disconnected device
-            if (MultiplayerManager.IsActive)
+            if (MultiplayerGameplay.IsInMatch)
             {
                 return;
             }
@@ -392,7 +392,7 @@ namespace YARG.Gameplay
 
         private void OnPausePressed(bool pause)
         {
-            if (!MultiplayerManager.IsActive)
+            if (!MultiplayerGameplay.IsInMatch)
             {
                 SetPaused(pause);
                 return;
@@ -638,7 +638,7 @@ namespace YARG.Gameplay
                 return true;
             }
 
-            if (MultiplayerManager.IsActive)
+            if (MultiplayerGameplay.IsInMatch)
             {
                 // Keeps updating the players while waiting, so remote tracks catch up
                 if (!_multiplayerEnding)
@@ -664,12 +664,15 @@ namespace YARG.Gameplay
             _remoteFinalFrames = await MultiplayerGameplay.AwaitFinishedFrames(MULTIPLAYER_FINISH_TIMEOUT);
 
             // The scene changed, or the session ended and went back to the menu
-            if (this == null || !MultiplayerManager.IsActive)
+            if (this == null || !MultiplayerGameplay.IsInMatch)
             {
                 return;
             }
 
             ShowResults();
+
+            // Anything played after this, like Restart on the score screen, is an offline song
+            MultiplayerGameplay.EndMatch();
         }
 
         private BaseStats GetResultStats(BasePlayer player)

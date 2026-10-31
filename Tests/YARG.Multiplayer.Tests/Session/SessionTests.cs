@@ -100,10 +100,13 @@ namespace YARG.Multiplayer.Tests.Session
             foreach (var client in h.Clients)
             {
                 client.SongOffered += _ => client.RespondToOffer(true);
+            }
+            h.Host.OfferSong(Offer(1, 10), () => new MemoryStream(new byte[10]));
+            h.Host.SetLocalPart(Instrument.FiveFretBass, Difficulty.Hard);
+            foreach (var client in h.Clients)
+            {
                 client.SetLocalPart(Instrument.FiveFretGuitar, Difficulty.Expert);
             }
-            h.Host.SetLocalPart(Instrument.FiveFretBass, Difficulty.Hard);
-            h.Host.OfferSong(Offer(1, 10), () => new MemoryStream(new byte[10]));
             h.Pump();
             h.Host.BeginLoad();
             h.Pump();
@@ -377,6 +380,25 @@ namespace YARG.Multiplayer.Tests.Session
         }
 
         [Test]
+        public void OfferSong_ResetsPartsPickedForThePreviousSong()
+        {
+            using var h = new Harness();
+            var a = h.AddClient("Ana");
+            a.SongOffered += _ => a.RespondToOffer(true);
+
+            h.Host.OfferSong(Offer(1, 10), () => new MemoryStream(new byte[10]));
+            h.Host.SetLocalPart(Instrument.FiveFretGuitar, Difficulty.Expert);
+            a.SetLocalPart(Instrument.ProDrums, Difficulty.Hard);
+            h.Pump();
+            Assert.That(h.Host.CanBeginLoad, Is.True);
+
+            // The next song may not chart the same parts, so everybody picks again
+            h.Host.OfferSong(Offer(2, 10), () => new MemoryStream(new byte[10]));
+            h.Pump();
+            Assert.That(h.Host.CanBeginLoad, Is.False);
+        }
+
+        [Test]
         public void BeginLoad_RequiresAllPlayersReady()
         {
             using var h = new Harness();
@@ -415,10 +437,10 @@ namespace YARG.Multiplayer.Tests.Session
             var b = h.AddClient("Bia");
             a.SongOffered += _ => a.RespondToOffer(true);
             b.SongOffered += _ => b.RespondToOffer(false);
+            h.Host.OfferSong(Offer(1, 10), () => new MemoryStream(new byte[10]));
             h.Host.SetLocalPart(Instrument.FiveFretGuitar, Difficulty.Expert);
             a.SetLocalPart(Instrument.FiveFretGuitar, Difficulty.Expert);
             b.SetLocalPart(Instrument.FiveFretGuitar, Difficulty.Expert);
-            h.Host.OfferSong(Offer(1, 10), () => new MemoryStream(new byte[10]));
             h.Pump();
             Assert.That(h.Host.CanBeginLoad, Is.False);
 

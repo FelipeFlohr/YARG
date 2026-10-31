@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
@@ -558,15 +559,7 @@ namespace YARG.Menu.DifficultySelect
                 // Online, the host offers the song and starts it from the lobby instead
                 if (MultiplayerManager.IsHosting)
                 {
-                    var manager = MultiplayerManager.Instance;
-                    var localPlayer = manager.LocalPlayer;
-                    if (manager.OfferSong(GlobalVariables.State.CurrentSong, speed) && localPlayer != null)
-                    {
-                        manager.Session.SetLocalPart(localPlayer.Profile.CurrentInstrument,
-                            localPlayer.Profile.CurrentDifficulty);
-                    }
-
-                    MultiplayerMenuFlow.OpenLobby();
+                    MultiplayerMenuFlow.OfferSong(GlobalVariables.State.CurrentSong, speed).Forget();
                     return;
                 }
 

@@ -495,7 +495,7 @@ public override bool ShouldUpdateInputsOnResume => true;
         {
             var breIndex = _actionToBreLaneIndex[(FiveLaneKeysAction)action];
 
-            _breLaneIndexToMostRecentTime[breIndex] = GameManager.VisualTime;
+            _breLaneIndexToMostRecentTime[breIndex] = PlayerVisualTime;
 
             _fretArray.PlayCodaHitAnimation((int)((FiveLaneKeysAction)action).ToFret());
         }

@@ -584,7 +584,7 @@ namespace YARG.Gameplay.Player
             }
 
             var breLaneIndex = _actionToBreLaneIndex[key];
-            _breLaneIndexToMostRecentTime[breLaneIndex] = GameManager.VisualTime;
+            _breLaneIndexToMostRecentTime[breLaneIndex] = PlayerVisualTime;
         }
 
         protected Dictionary<int, int> GetLaneIndexes(int leftmostKey)

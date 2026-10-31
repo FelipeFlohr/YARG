@@ -161,6 +161,8 @@ namespace YARG.Multiplayer.Session
             {
                 player.Status = LobbyPlayerStatus.Idle;
                 player.Progress = 0;
+                // The new song may not chart the part picked before
+                player.HasPart = false;
             }
             // The host offers from its own library
             LocalPlayer.Status = LobbyPlayerStatus.HasSong;

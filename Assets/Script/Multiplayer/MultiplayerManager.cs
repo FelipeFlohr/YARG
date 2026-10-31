@@ -130,17 +130,25 @@ namespace YARG.Multiplayer
         /// <summary>
         /// Host only: offers the song picked in the difficulty select to everybody.
         /// </summary>
-        public bool OfferSong(SongEntry song, float songSpeed)
+        public async UniTask<bool> OfferSong(SongEntry song, float songSpeed)
         {
             if (Session is not HostSession host)
             {
                 throw new InvalidOperationException("Only the host can offer songs");
             }
 
+            if (host.State != SessionState.Lobby && host.State != SessionState.Results &&
+                host.State != SessionState.Transferring)
+            {
+                YargLogger.LogFormatWarning("Can't offer a song while the session is {0}", host.State);
+                return false;
+            }
+
             SongPackage package;
             try
             {
-                package = MultiplayerSongLibrary.CreatePackage(song);
+                // Zipping a big ini folder takes a while; the session must keep ticking meanwhile
+                package = await UniTask.RunOnThreadPool(() => MultiplayerSongLibrary.CreatePackage(song));
             }
             catch (Exception e) when (e is IOException || e is UnauthorizedAccessException)
             {
@@ -155,14 +163,37 @@ namespace YARG.Multiplayer
                 return false;
             }
 
-            _package?.Dispose();
-            _package = package;
-            _offeredSong = song;
+            // The session ended or changed while packaging
+            if (Session != host)
+            {
+                package.Dispose();
+                return false;
+            }
 
             var offer = new SongOffer(song.Hash, song.Name.Original, song.Artist.Original, package.Kind,
                 package.Length, songSpeed);
+
+            // Offering cancels the running transfers first, so the old package is free to delete
             host.OfferSong(offer, package.Open);
+
+            var previous = _package;
+            _package = package;
+            _offeredSong = song;
+            DisposePackage(previous);
             return true;
+        }
+
+        private static void DisposePackage(SongPackage package)
+        {
+            try
+            {
+                package?.Dispose();
+            }
+            catch (Exception e) when (e is IOException || e is UnauthorizedAccessException)
+            {
+                // Removed with the rest of the temp folder later
+                YargLogger.LogException(e, "Failed to delete an old multiplayer song package");
+            }
         }
 
         private void Awake()
@@ -247,7 +278,7 @@ namespace YARG.Multiplayer
 
             _receiver?.Dispose();
             _receiver = null;
-            _package?.Dispose();
+            DisposePackage(_package);
             _package = null;
             _offeredSong = null;
 
@@ -262,10 +293,14 @@ namespace YARG.Multiplayer
         private void OnSessionEnded(string reason)
         {
             ToastManager.ToastError(Localize.KeyFormat("Menu.Multiplayer.SessionEnded", reason));
+
+            // An offline song played while connected keeps going
+            bool inMatch = MultiplayerGameplay.IsInMatch;
             EndSession();
 
-            if (GlobalVariables.Instance.CurrentScene == SceneIndex.Gameplay)
+            if (inMatch && GlobalVariables.Instance.CurrentScene == SceneIndex.Gameplay)
             {
+                MultiplayerMenuFlow.CloseAll();
                 GlobalVariables.Instance.LoadScene(SceneIndex.Menu);
             }
         }
@@ -290,6 +325,7 @@ namespace YARG.Multiplayer
                 return;
             }
 
+            MultiplayerMenuFlow.CloseAll();
             MultiplayerGameplay.BeginMatch(session);
 
             GlobalVariables.State = PersistentState.Default;

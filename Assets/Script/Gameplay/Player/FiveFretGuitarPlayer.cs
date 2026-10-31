@@ -484,7 +484,7 @@ namespace YARG.Gameplay.Player
         {
             var asFret = _actionToFret[(GuitarAction)action];
 
-            _fretToMostRecentTime[asFret] = GameManager.VisualTime;
+            _fretToMostRecentTime[asFret] = PlayerVisualTime;
             _fretArray.PlayCodaHitAnimation((int)asFret);
         }
 

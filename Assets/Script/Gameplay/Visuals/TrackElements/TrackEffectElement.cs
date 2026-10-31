@@ -253,7 +253,7 @@ namespace YARG.Gameplay.Visuals
             _visibilityToken = null;
 
             _visibilityInTransition = true;
-            _visibilityStartTime = GameManager.VisualTime;
+            _visibilityStartTime = Player.PlayerVisualTime;
             _maskEnabled = enable && useMask;
             _visibilityStartValue = Visibility;
             Visibility = enable ? 1.0f : 0.0f;
@@ -616,7 +616,7 @@ namespace YARG.Gameplay.Visuals
         {
             if (_visibilityInTransition)
             {
-                var elapsed = (float) (GameManager.VisualTime - _visibilityStartTime);
+                var elapsed = (float) (Player.PlayerVisualTime - _visibilityStartTime);
                 var progress = Mathf.Clamp01(elapsed / VISIBILITY_TRANSITION_DURATION);
 
                 var currentVisibility = Mathf.Lerp(_visibilityStartValue, Visibility, progress);
@@ -625,7 +625,7 @@ namespace YARG.Gameplay.Visuals
 
             if (_maskEnabled)
             {
-                var timeSinceStart = GameManager.VisualTime - _visibilityStartTime;
+                var timeSinceStart = Player.PlayerVisualTime - _visibilityStartTime;
                 // Go up the track at twice the notespeed (extra parentheses for clarity)
                 SetEffectMask((float) (StartZ + (timeSinceStart * Math.Max(10f, Player.NoteSpeed * 3))));
             }
@@ -633,7 +633,7 @@ namespace YARG.Gameplay.Visuals
 
         private float ZFromTime(double time)
         {
-            float z = TrackPlayer.STRIKE_LINE_POS + (float) (time - GameManager.VisualTime) * Player.NoteSpeed;
+            float z = TrackPlayer.STRIKE_LINE_POS + (float) (time - Player.PlayerVisualTime) * Player.NoteSpeed;
             return z;
         }
     }

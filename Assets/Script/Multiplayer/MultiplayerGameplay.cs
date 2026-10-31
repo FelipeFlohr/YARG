@@ -38,6 +38,12 @@ namespace YARG.Multiplayer
         private static double Now => MultiplayerManager.Instance.Now;
 
         /// <summary>
+        /// Whether an online song is being loaded or played. A session can be active without one,
+        /// e.g. while in the lobby or when playing a song offline after the score screen.
+        /// </summary>
+        public static bool IsInMatch => _session != null;
+
+        /// <summary>
         /// Starts listening for the song's game messages. Called when loading starts, before the
         /// gameplay scene exists, so setups and inputs that arrive early are kept.
         /// </summary>
@@ -142,9 +148,9 @@ namespace YARG.Multiplayer
 
         /// <summary>
         /// Reports this machine as loaded and waits for the host's start time.
-        /// Returns false when the session ended while waiting.
+        /// Returns false when the session ended or nobody started the song within the timeout.
         /// </summary>
-        public static async UniTask<bool> WaitForStart()
+        public static async UniTask<bool> WaitForStart(double timeoutSeconds)
         {
             var session = _session;
             if (session == null)
@@ -153,9 +159,14 @@ namespace YARG.Multiplayer
             }
 
             session.ReportLoaded();
-            await UniTask.WaitUntil(() => _session != session ||
-                (session.StartTimeLocal.HasValue && Now >= session.StartTimeLocal.Value));
-            return _session == session;
+            double deadline = Now + timeoutSeconds;
+            await UniTask.WaitUntil(() => _session != session || IsStarted(session) || Now >= deadline);
+            return _session == session && IsStarted(session);
+        }
+
+        private static bool IsStarted(IMultiplayerSession session)
+        {
+            return session.StartTimeLocal.HasValue && Now >= session.StartTimeLocal.Value;
         }
 
         public static void SendFinished(BasePlayer localPlayer)

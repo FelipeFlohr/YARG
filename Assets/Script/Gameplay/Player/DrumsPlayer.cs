@@ -548,11 +548,11 @@ namespace YARG.Gameplay.Player
             // This is done here for drums rather than in-engine because engine doesn't know about pad ordering
             if (Engine.IsCodaActive)
             {
-                CurrentCoda.HitLane(GameManager.VisualTime, (int) action);
+                CurrentCoda.HitLane(PlayerVisualTime, (int) action);
 
                 if (_actionToBreLaneIndex.TryGetValue(action, out var breLaneIndex))
                 {
-                    _breLaneIndexToMostRecentTime[breLaneIndex] = GameManager.VisualTime;
+                    _breLaneIndexToMostRecentTime[breLaneIndex] = PlayerVisualTime;
                 }
 
             }

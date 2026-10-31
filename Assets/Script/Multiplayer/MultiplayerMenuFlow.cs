@@ -1,4 +1,5 @@
 using System.Linq;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using YARG.Core;
 using YARG.Core.Extensions;
@@ -75,13 +76,29 @@ namespace YARG.Multiplayer
         public static void OpenLobby()
         {
             if (!MultiplayerManager.IsActive || IsLobbyOpen || DialogManager.Instance.IsDialogShowing ||
-                GlobalVariables.Instance.CurrentScene != SceneIndex.Menu)
+                GlobalVariables.Instance.CurrentScene != SceneIndex.Menu || MultiplayerGameplay.IsInMatch)
             {
                 return;
             }
 
             _lobby =DialogManager.Instance.ShowList(Localize.Key("Menu.Multiplayer.Lobby"));
             RebuildLobby();
+        }
+
+        /// <summary>
+        /// Host only: offers the song picked in the difficulty select with the part picked there,
+        /// then shows the lobby.
+        /// </summary>
+        public static async UniTaskVoid OfferSong(SongEntry song, float songSpeed)
+        {
+            var manager = MultiplayerManager.Instance;
+            if (await manager.OfferSong(song, songSpeed) && manager.LocalPlayer is { } localPlayer)
+            {
+                manager.Session?.SetLocalPart(localPlayer.Profile.CurrentInstrument,
+                    localPlayer.Profile.CurrentDifficulty);
+            }
+
+            OpenLobby();
         }
 
         public static void OpenPartPicker(SongEntry song)
@@ -229,6 +246,20 @@ namespace YARG.Multiplayer
             }
 
             return $"{player.Name} - {player.Instrument.ToLocalizedName()} {player.Difficulty.ToLocalizedName()} - {status}";
+        }
+
+        /// <summary>
+        /// Closes any dialog this flow opened (lobby, part picker, join prompt) before leaving the menu.
+        /// The dialog manager is persistent, so they would otherwise stay over gameplay.
+        /// </summary>
+        public static void CloseAll()
+        {
+            _openLobbyRequested = false;
+            _lobby = null;
+            if (DialogManager.Instance.IsDialogShowing)
+            {
+                DialogManager.Instance.ClearDialog();
+            }
         }
 
         private static void CloseLobby()

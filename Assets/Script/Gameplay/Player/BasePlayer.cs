@@ -147,6 +147,12 @@ namespace YARG.Gameplay.Player
             }
         }
 
+        /// <summary>
+        /// The visual time this player's track is drawn at. Track elements must use this instead of
+        /// <see cref="GameManager.VisualTime"/>, so a remote track's notes line up with its lagging engine.
+        /// </summary>
+        public double PlayerVisualTime => GetPlayerVisualTime(GameManager.VisualTime);
+
         private double GetPlayerVisualTime(double visualTime)
         {
             // The vocal track is shared by every singer, so remote singers stay on local time
@@ -299,7 +305,7 @@ namespace YARG.Gameplay.Player
 
             BaseEngine.Update(time);
 
-            if (MultiplayerManager.IsActive && !Player.IsReplay)
+            if (MultiplayerGameplay.IsInMatch && !Player.IsReplay)
             {
                 MultiplayerGameplay.OnLocalEngineTime(this, time);
             }
@@ -424,7 +430,7 @@ namespace YARG.Gameplay.Player
             OnInputQueued(input);
             _replayInputs.Add(input);
 
-            if (MultiplayerManager.IsActive)
+            if (MultiplayerGameplay.IsInMatch)
             {
                 MultiplayerGameplay.OnLocalInput(this, input);
             }

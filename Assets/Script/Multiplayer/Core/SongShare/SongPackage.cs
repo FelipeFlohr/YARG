@@ -26,7 +26,9 @@ namespace YARG.Multiplayer.SongShare
         /// <summary>
         /// Opens a new read stream; one per transfer, so several clients can download at once.
         /// </summary>
-        public Stream Open() => new FileStream(_path, FileMode.Open, FileAccess.Read, FileShare.Read);
+        public Stream Open() => new FileStream(_path, FileMode.Open, FileAccess.Read,
+            // Delete: a re-offer disposes the package while a cancelled transfer may still hold it
+            FileShare.Read | FileShare.Delete);
 
         public void Dispose()
         {
