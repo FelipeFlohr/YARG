@@ -44,6 +44,13 @@ regra de dificuldade jogável compartilhada (`PartDifficulty`) no seletor online
 iguais às enviadas em `Finished`. Só `same-instrument` e `no-stems` foram refeitos: ambos `OK` (build `~/yarg-build-mp-banda`).
 `band4` e `keys` não foram refeitos nesta rodada.
 
+**Rodada 4 (review do PR).** Build `~/yarg-build-mp-banda` refeita no commit 3d58cdfc depois de: seletor de parte só com partes
+que a música tem (`PartRules.HasPlayablePart`, regra movida para `Multiplayer/Core` e testada), timeout de conexão de 10 s
+separado do de 30 s da sessão, e `players=N` nos logs `Band result:` e `Band:` (o verificador compara o número entre as
+máquinas). Só `same-instrument` e `no-stems` foram refeitos: ambos `OK` (`Band: score=208097 stars=5 players=2` nas duas
+máquinas de `same-instrument`; `score=583762 stars=5 players=2` em `no-stems`). `band4` e `keys` continuam valendo para a
+build da rodada 2.
+
 ## 1. Pontuação final idêntica em todas as máquinas
 
 - [x] `same-instrument`: host e `guit2` com as mesmas duas linhas `Result:` e `Band: score=208533 stars=5`.
