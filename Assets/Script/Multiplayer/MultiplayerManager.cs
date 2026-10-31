@@ -246,8 +246,10 @@ namespace YARG.Multiplayer
         private SessionConfig CreateConfig()
         {
             var player = LocalPlayer ?? throw new InvalidOperationException("No active local player");
+            // Loading a song blocks the main thread for several seconds on slow machines, so the default
+            // 5 second silence limit drops peers that are only busy loading.
             return new SessionConfig(GlobalVariables.Instance.CurrentVersion, player.Profile.Name,
-                log: message => YargLogger.LogFormatInfo("[Multiplayer] {0}", message));
+                timeoutSeconds: 30, log: message => YargLogger.LogFormatInfo("[Multiplayer] {0}", message));
         }
 
         private void EnsureNoSession()
