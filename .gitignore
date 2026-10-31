@@ -86,6 +86,7 @@ crashlytics-build.properties
 /ServerData
 /[Aa]ssets/StreamingAssets/aa*
 /[Aa]ssets/AddressableAssetsData/link.xml*
+/Assets/Settings/AddressableAssetsData/link.xml*
 /[Aa]ssets/Addressables_Temp*
 # By default, Addressables content builds will generate addressables_content_state.bin
 # files in platform-specific subfolders, for example:
