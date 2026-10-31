@@ -51,7 +51,7 @@ namespace YARG.Gameplay
         [SerializeField]
         private GameObject _proGuitarPrefab;
 
-        private const double MULTIPLAYER_SETUP_TIMEOUT = 15;
+        private const double MULTIPLAYER_SETUP_TIMEOUT = 60;
         private const double MULTIPLAYER_START_TIMEOUT = 60;
 
         private const double NORMALIZED_SAMPLE_VOLUME_MULTIPLIER = 0.5;
