@@ -285,6 +285,21 @@ namespace YARG.Multiplayer.Tests.Session
         }
 
         [Test]
+        public void Host_KeepsAJoinedPeerThroughTheLongTimeoutOfSilence()
+        {
+            using var h = new Harness(timeoutSeconds: 30);
+            h.AddClient("Ana");
+
+            h.Advance(20, tickClients: false);
+            Assert.That(h.Log, Has.None.Contains("timed out"), "joined peers get the long timeout");
+            Assert.That(PlayerIn(h.Host, 1).Status, Is.Not.EqualTo(LobbyPlayerStatus.Left));
+
+            h.Advance(11, tickClients: false);
+            Assert.That(h.Log, Has.Some.Contains("timed out"));
+            Assert.That(PlayerIn(h.Host, 1).Status, Is.EqualTo(LobbyPlayerStatus.Left));
+        }
+
+        [Test]
         public void Host_DropsAPeerThatNeverSaysHelloAfterTheConnectTimeout()
         {
             using var h = new Harness(timeoutSeconds: 30);

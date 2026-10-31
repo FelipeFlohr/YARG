@@ -37,10 +37,10 @@ namespace YARG.Multiplayer.Gameplay
             Func<Instrument, Difficulty, bool> hasChart, Instrument instrument, Difficulty difficulty)
         {
             // For vocals, the part values hold a sub-track mask rather than a difficulty mask,
-            // so every difficulty but Expert+ is valid, provided the song has the part at all
+            // so every difficulty but Expert+ is valid (whether the song has the part is HasPlayablePart's job)
             if (IsVocal(instrument))
             {
-                return hasInstrument(instrument) && difficulty is not Difficulty.ExpertPlus;
+                return difficulty is not Difficulty.ExpertPlus;
             }
 
             // For PK, disallow beginner

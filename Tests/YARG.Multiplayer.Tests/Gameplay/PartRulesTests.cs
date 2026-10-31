@@ -40,8 +40,9 @@ namespace YARG.Multiplayer.Tests.Gameplay
         {
             var song = new FakeSong().With(Instrument.FiveFretGuitar, AllButPlus);
 
+            // Callers check the part first; the difficulty rule alone matches the solo menu
             Assert.That(song.PlayablePart(Instrument.Vocals), Is.False);
-            Assert.That(song.PlayableDifficulty(Instrument.Vocals, Difficulty.Expert), Is.False);
+            Assert.That(song.PlayableDifficulty(Instrument.Vocals, Difficulty.Expert), Is.True);
         }
 
         [Test]
@@ -51,8 +52,7 @@ namespace YARG.Multiplayer.Tests.Gameplay
 
             Assert.That(song.PlayablePart(Instrument.Vocals), Is.True);
             Assert.That(song.PlayablePart(Instrument.Harmony), Is.False);
-            Assert.That(song.PlayableDifficulty(Instrument.Harmony, Difficulty.Medium), Is.False);
-            Assert.That(song.PlayableDifficulty(Instrument.PartyVocals, Difficulty.Medium), Is.False);
+            Assert.That(song.PlayablePart(Instrument.PartyVocals), Is.False);
         }
 
         [Test]
