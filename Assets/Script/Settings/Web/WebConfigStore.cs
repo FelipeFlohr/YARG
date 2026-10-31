@@ -2,6 +2,7 @@ using System.IO;
 using YARG.Core.Logging;
 using YARG.Helpers;
 using YARG.Helpers.Web;
+using YARG.Input.Bindings;
 using YARG.Localization;
 using YARG.Menu.Persistent;
 using YARG.Player;
@@ -12,6 +13,7 @@ namespace YARG.Settings.Web
     {
         Settings,
         Profiles,
+        Bindings,
     }
 
     /// <summary>
@@ -39,7 +41,7 @@ namespace YARG.Settings.Web
                 return;
             }
 
-            foreach (var file in new[] { WebConfigFile.Settings, WebConfigFile.Profiles })
+            foreach (var file in new[] { WebConfigFile.Settings, WebConfigFile.Profiles, WebConfigFile.Bindings })
             {
                 string text = WebBridge.StorageGet(GetKey(file));
                 if (string.IsNullOrEmpty(text))
@@ -58,18 +60,19 @@ namespace YARG.Settings.Web
             }
         }
 
-        public static void Persist(WebConfigFile file)
+        /// <summary>Returns false only when the browser refused to store the data.</summary>
+        public static bool Persist(WebConfigFile file)
         {
             if (!PlatformInfo.IsWeb)
             {
-                return;
+                return true;
             }
 
             string path = GetPath(file);
             if (!File.Exists(path))
             {
                 YargLogger.LogWarning($"Cannot persist {file}: `{path}` does not exist.");
-                return;
+                return true;
             }
 
             bool success;
@@ -89,6 +92,8 @@ namespace YARG.Settings.Web
                 _warnedStorageBlocked = true;
                 ToastManager.ToastWarning(() => Localize.Key("Web.ConfigNotSaved"));
             }
+
+            return success;
         }
 
         public static string ReadFile(WebConfigFile file)
@@ -104,12 +109,18 @@ namespace YARG.Settings.Web
             File.WriteAllText(path, text);
         }
 
-        private static string GetKey(WebConfigFile file) => file == WebConfigFile.Settings
-            ? "yarg.settings"
-            : "yarg.profiles";
+        private static string GetKey(WebConfigFile file) => file switch
+        {
+            WebConfigFile.Settings => "yarg.settings",
+            WebConfigFile.Profiles => "yarg.profiles",
+            _ => "yarg.bindings",
+        };
 
-        private static string GetPath(WebConfigFile file) => file == WebConfigFile.Settings
-            ? SettingsManager.SettingsFilePath
-            : PlayerContainer.ProfilesFilePath;
+        private static string GetPath(WebConfigFile file) => file switch
+        {
+            WebConfigFile.Settings => SettingsManager.SettingsFilePath,
+            WebConfigFile.Profiles => PlayerContainer.ProfilesFilePath,
+            _ => BindingsContainer.BindingsFilePath,
+        };
     }
 }

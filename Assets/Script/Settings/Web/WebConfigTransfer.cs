@@ -1,5 +1,7 @@
+using System;
 using UnityEngine;
 using YARG.Core.IO;
+using YARG.Core.Logging;
 using YARG.Helpers.Web;
 using YARG.Localization;
 using YARG.Menu.Persistent;
@@ -20,7 +22,8 @@ namespace YARG.Settings.Web
         {
             string bundle = ConfigBundle.Create(
                 WebConfigStore.ReadFile(WebConfigFile.Settings),
-                WebConfigStore.ReadFile(WebConfigFile.Profiles));
+                WebConfigStore.ReadFile(WebConfigFile.Profiles),
+                WebConfigStore.ReadFile(WebConfigFile.Bindings));
             WebBridge.DownloadText("yarg-config.json", bundle);
         }
 
@@ -54,22 +57,51 @@ namespace YARG.Settings.Web
                 return;
             }
 
-            if (!ConfigBundle.TryParse(text, out string settingsJson, out string profilesJson, out _))
+            // Validate everything before touching any file
+            if (!ConfigBundle.TryParse(text, out string settingsJson, out string profilesJson,
+                out string bindingsJson, out _))
             {
                 ToastManager.ToastError(Localize.Key("Web.ImportInvalid"));
                 return;
             }
 
-            if (settingsJson != null)
+            var parts = new (WebConfigFile File, string Json)[]
             {
-                WebConfigStore.WriteFile(WebConfigFile.Settings, settingsJson);
-                WebConfigStore.Persist(WebConfigFile.Settings);
+                (WebConfigFile.Settings, settingsJson),
+                (WebConfigFile.Profiles, profilesJson),
+                (WebConfigFile.Bindings, bindingsJson),
+            };
+
+            try
+            {
+                foreach (var (file, json) in parts)
+                {
+                    if (json != null)
+                    {
+                        WebConfigStore.WriteFile(file, json);
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                YargLogger.LogException(e, "Failed to write the imported settings!");
+                ToastManager.ToastError(Localize.Key("Web.ImportInvalid"));
+                return;
             }
 
-            if (profilesJson != null)
+            bool persisted = true;
+            foreach (var (file, json) in parts)
             {
-                WebConfigStore.WriteFile(WebConfigFile.Profiles, profilesJson);
-                WebConfigStore.Persist(WebConfigFile.Profiles);
+                if (json != null)
+                {
+                    persisted &= WebConfigStore.Persist(file);
+                }
+            }
+
+            if (!persisted)
+            {
+                ToastManager.ToastError(Localize.Key("Web.ConfigNotSaved"));
+                return;
             }
 
             WebBridge.Reload();
