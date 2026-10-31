@@ -1,0 +1,446 @@
+Conversa: fork do YARG com multiplayer online
+Data: 2026-10-30
+========================================================================
+
+--- USUÁRIO ---
+Eu estava pensando em criar um fork do jogo, implementar multiplayer e deixar ele jogável no navegador. O quão difícil seria fazer isso?
+
+[executou comando: Inspect Unity version, packages and native plugins]
+
+[executou comando: Check license, network code, threading and file IO usage]
+
+[executou comando: Check README fork notes and audio/native code]
+
+--- CLAUDE ---
+Resumindo: **multiplayer é difícil, mas dá para fazer. Rodar no navegador é muito difícil**, a ponto de ser na prática um port. Juntar as duas coisas é um projeto de vários meses.
+
+## Licença (fork)
+O projeto usa **LGPL v3** ([LICENSE](LICENSE)), então o fork é permitido. Você só precisa manter o código aberto sob a mesma licença e dar os créditos. Eu também trocaria o nome para não confundir com o YARG oficial. Antes de começar, vale perguntar no Discord do YARC se já existe algum trabalho de online planejado. Contribuir com o projeto original pode dar menos trabalho do que manter um fork.
+
+## Multiplayer: difícil, mas viável
+**O que ajuda:**
+- Em jogo de ritmo, cada jogador pode rodar a própria engine localmente. Não é preciso sincronizar física nem estado complexo, só **início da música, inputs e pontuação**.
+- O `YARG.Core` já tem as engines separadas da Unity e um sistema de replay (`YARG.Core/Replays/ReplayFrame.cs`, `ReplayData.cs`). Se você transmitir os inputs como "replay ao vivo", dá para mostrar a pista dos outros jogadores reproduzindo esses inputs.
+- As músicas já têm hash, o que permite conferir se todos têm o mesmo chart.
+
+**O que dá trabalho:**
+- Lobby e matchmaking, além da infraestrutura de rede: NAT, relay e servidor.
+- Começar a música ao mesmo tempo para todos, com sincronização de relógio e compensação de latência.
+- As mecânicas de banda (star power compartilhado, multiplicador de banda) precisam de sincronização de verdade.
+- Pausa, desconexões e jogadores que não têm a música.
+- Não existe nenhum código de rede de gameplay hoje. Só achei integrações como RB3E, sACN e Data Stream.
+
+**Estimativa:** um MVP "versus" (cada um joga e vê o placar dos outros) leva de algumas semanas a ~2 meses para quem já conhece Unity/C#. Um co-op de banda completo, com as pistas dos outros visíveis, leva bem mais. Bibliotecas possíveis: LiteNetLib, FishNet, Mirror ou Netcode for GameObjects com Unity Relay.
+
+## Navegador (WebGL/WebGPU): o maior problema
+O jogo depende de várias coisas que não existem no navegador:
+
+| Componente | Problema na web |
+|---|---|
+| **BASS** (áudio, mixagem, mudança de tempo, microfone) | É biblioteca nativa, sem build web. O áudio teria que ser reescrito em cima do Web Audio. Num jogo de ritmo, áudio e latência são o núcleo do jogo. |
+| SQLite, STB2CSharp, LibUSB, Discord SDK | São `.so`/`.dll` nativos (`Assets/Plugins/`) e todos precisam ser substituídos. |
+| Threads | ~20 arquivos usam `Thread`/`Task.Run`/`Parallel`, e o C# na build WebGL da Unity praticamente não tem multithreading. O scan de músicas sofreria muito. |
+| Sistema de arquivos | As músicas são lidas de pastas locais (CON, sng, mid/ini). No navegador só há upload ou File System Access API (só no Chrome). Hospedar as músicas para os jogadores esbarra em direitos autorais. |
+| Controles | Guitarras e baterias dependem de HID/XInput/MIDI (HIDrogen, PlasticBand, Minis). No navegador há só Gamepad API, WebHID e WebMIDI, com suporte parcial. |
+| Desempenho | URP, cenários e personagens VRM batem nos limites de memória e de tempo de carregamento do navegador. |
+| Sockets | UDP não existe no navegador. O multiplayer teria que ser feito com WebSocket ou WebRTC. |
+
+**Estimativa:** meses de trabalho em tempo integral, e o resultado provavelmente seria uma versão inferior à de desktop, principalmente em latência de áudio e suporte a instrumentos.
+
+## Minha recomendação
+1. **Comece pelo multiplayer no desktop.** É a parte com melhor custo-benefício e aproveita a arquitetura que já existe.
+2. **Deixe o navegador de lado**, a não ser que seja essencial. Se for, considere fazer um cliente web separado, mais leve, só com o modo "versus", em vez de portar o jogo inteiro.
+
+Se quiser, posso esboçar a arquitetura do multiplayer: o protocolo, o que sincronizar e onde encaixar no `YARG.Core` e nas cenas de gameplay.
+
+--- USUÁRIO ---
+Okay, acho interessante primeiro criar um cliente multiplayer e depois portar para o navegador. E sobre o multiplayer: eu não acho que a sincronização seja um grande problema, pois quando eu jogava Guitar Hero multiplayer de verdade havia uma certa dessincronização. Eu imagino que o multiplayer deve funcionar assim: cada um joga seu instrumento a parte, e de certos ticks em ticks isso vai sincronizando, sabe?
+
+Sobre servidor: eu não estou a fim de fazer algo muito avançado, sabe? Eu queria hospedar localmente e abrir via Tailscale mesmo
+
+Sobre multiplayer e sincronização: seria necessário uma maneira de compartilhar a música com outros jogadores e detectar quando os mesmos já tem elas baixadas, sabe?
+
+[usou a skill: superpowers:brainstorming]
+
+[executou comando: List song cache types and gameplay scripts]
+
+[executou comando: Inspect how song hash is computed]
+
+[executou comando: Inspect GameManager and engine stats]
+
+--- CLAUDE (pergunta) ---
+Como você quer ver os outros jogadores na sua tela durante a música?
+  - Placar primeiro, pistas depois (Recomendado): MVP mostra só um HUD com score/combo/star power de cada um (sync barato por ticks). Pistas completas ficam para uma segunda fase.
+  - Só placar/HUD: Cada um vê só a própria pista e um painel com score, combo, multiplicador e star power dos outros. Nunca mostrar as pistas remotas.
+  - Pistas completas desde já: As pistas dos outros aparecem como no multiplayer local, reproduzindo os inputs deles (tipo replay ao vivo). Exige transmitir inputs, bem mais trabalho.
+
+--- USUÁRIO (resposta) ---
+Pistas completas desde já, mas como eu já disse, eu sei que haverá alguma dessincronização entre jogadores. Não creio que tenha problema nisso, sabe?
+
+[executou comando: Inspect replay frame and replay input playback]
+
+--- CLAUDE (pergunta) ---
+Qual modo de jogo o multiplayer deve ter primeiro?
+  - Banda co-op (Recomendado): Como o multiplayer local atual: score de banda somado, multiplicador de banda e star power em uníssono. Reaproveita o EngineManager existente.
+  - Versus: Cada um joga por si e o ranking aparece no final. Mais simples: não precisa sincronizar mecânicas de banda.
+  - Os dois: O host escolhe o modo no lobby. Mais escopo no MVP.
+
+--- USUÁRIO (resposta) ---
+Banda co-op (Recomendado)
+
+[executou comando: Check for sng writer and song folder settings]
+
+--- CLAUDE (pergunta) ---
+Quais formatos de música o compartilhamento deve suportar no MVP?
+  - Pasta ini e .sng (Recomendado): Cobre a maioria das músicas customizadas (Clone Hero/Encore). Pasta é enviada compactada; .sng vai como está. CON/RBCON ficam de fora por ora.
+  - Todos, incluindo CON: Também envia CONs do Rock Band. CONs packed podem ter várias músicas num arquivo e upgrades separados, o que complica.
+  - Só .sng: Mais simples: um arquivo por música. Quem tem pasta ini não consegue compartilhar.
+
+--- USUÁRIO (resposta) ---
+Pasta ini e .sng (Recomendado)
+
+--- CLAUDE ---
+Um detalhe que simplifica: como é o host que escolhe a música, **ele sempre tem a música**. A transferência é sempre host → cliente, então não precisa de troca P2P entre os clientes.
+
+--- CLAUDE (pergunta) ---
+O que acontece com uma música recebida do host?
+  - Salvar numa pasta fixa (Recomendado): Vai para uma pasta 'Multiplayer Downloads' adicionada automaticamente às pastas de música; fica disponível depois e não precisa baixar de novo.
+  - Temporária: Usada só na sessão e apagada ao sair. Nada fica na biblioteca do jogador.
+  - Perguntar ao jogador: Ao terminar a sessão, pergunta se quer manter as músicas baixadas.
+
+--- USUÁRIO (resposta) ---
+Deve ter uma configuração no menu onde o usuário escolhe se ele quer salvar as músicas baixadas do multiplayer, ou se ele quer manter salvo numa pasta
+
+--- CLAUDE (pergunta) ---
+Qual abordagem de rede seguimos?
+  - TCP próprio + abstração (Recomendado): Simples, sem dependências, e o port para navegador vira só um novo transporte WebSocket.
+  - LiteNetLib (UDP): Menor latência; exige trocar o transporte no port para navegador.
+  - WebSocket desde já: Mesmo protocolo, mas já nasce compatível com navegador; precisa de um servidor WebSocket embutido no host (lib extra).
+
+--- USUÁRIO (resposta) ---
+TCP próprio + abstração (Recomendado)
+
+[executou comando: List script folders and YargPlayer members]
+
+--- CLAUDE ---
+A seção 1 do design (arquitetura e componentes) segue abaixo. Vou apresentando uma seção por vez e confirmando com você antes de passar para a próxima.
+
+## Seção 1: Arquitetura e componentes
+
+**Topologia:** estrela. O host é um jogador normal que também abre um servidor TCP. Os clientes conectam em `IP-Tailscale:porta` e o host repassa as mensagens de cada cliente para os outros. **Cada máquina é a autoridade sobre os próprios jogadores**: os inputs e os stats de um jogador valem como saíram da máquina dele.
+
+**Código novo em `Assets/Script/Multiplayer/`:**
+
+| Unidade | Função | Depende de |
+|---|---|---|
+| `Transport/` | `INetTransport` mais `TcpTransport` (servidor e cliente, mensagens com prefixo de tamanho) | só .NET |
+| `Protocol/` | Tipos de mensagem e serialização binária, sem dependência da Unity, para reaproveitar no port web | `YARG.Core` (`GameInput`, `HashWrapper`) |
+| `Session/` | `HostSession` e `ClientSession`: lista de jogadores (perfil, instrumento, dificuldade) e a máquina de estados **Lobby → Escolha → Transferência → Carregando → Jogando → Resultados** | Protocol, Transport |
+| `ClockSync` | Ping/pong para estimar a diferença de relógio com o host. O host manda "comece no instante T" | Session |
+| `SongShare/` | Compara músicas pelo `Hash` do chart. Empacota uma pasta ini em zip (o `.sng` vai como está), envia em pedaços e, no cliente, extrai na pasta configurada ou numa temporária e registra a música no cache | `YARG.Core.Song` |
+| `Gameplay/` | Ponte com o `GameManager`. **Jogador local:** captura os `GameInput` e envia em lotes. **Jogador remoto:** um `YargPlayer` "remoto", parecido com um replay, cuja lista de inputs cresce conforme as mensagens chegam | `BasePlayer`, `EngineManager` |
+| `Menu/` | Telas "Hospedar / Entrar (IP:porta)", lobby e progresso dos downloads, mais a configuração "Salvar músicas baixadas" e a pasta de destino | `MenuManager` |
+
+**Por que dá certo:** o `GameManager` já monta vários jogadores numa banda e o `EngineManager` já calcula a pontuação de banda, o multiplicador e o star power em uníssono. Os jogadores remotos entram ali como mais jogadores da banda, então cada cliente calcula a banda localmente com os dados que tem. Pequenas diferenças no placar de banda entre as máquinas são aceitáveis, dentro da dessincronia que você já admitiu.
+
+**Fora do MVP:** CON/RBCON, mais de um jogador local na mesma máquina conectada, reconexão no meio da música, anti-cheat e o port para navegador. O port continua previsto: é só implementar `INetTransport` com WebSocket.
+
+--- CLAUDE (pergunta) ---
+A Seção 1 (arquitetura e componentes) está certa?
+  - Sim, próxima seção: Seguir para fluxo de dados (sync de início, inputs, pista remota atrasada).
+  - Quero ajustar: Algo na topologia, componentes ou escopo do MVP precisa mudar (explique em Other).
+
+--- USUÁRIO (resposta) ---
+Sim, próxima seção
+
+[executou comando: Check how players use song time and replay inputs]
+
+--- CLAUDE ---
+## Seção 2: Fluxo de dados
+
+**1. Escolha e transferência da música**
+1. O host escolhe a música e manda `SongOffer` com o `Hash`, o nome, o tamanho e a velocidade da música. Todos tocam na mesma velocidade.
+2. Cada cliente procura o `Hash` no próprio cache e responde `HaveSong` ou `NeedSong`.
+3. Para quem precisa, o host transmite `SongChunk` (pedaços de ~64 KB). O cliente monta o arquivo, confere o hash do chart e registra a música no cache. Enquanto isso, o lobby mostra o progresso de cada jogador.
+
+**2. Início sincronizado**
+- Durante todo o lobby rodam pings que estimam a diferença entre o relógio de cada cliente e o do host.
+- Quando todos mandam `Loaded`, o host envia `StartAt(T_host + 3s)`. Cada cliente converte esse instante para o próprio relógio e inicia o `SongRunner` nele.
+- Erro esperado de alguns milissegundos. Como cada um julga os próprios inputs localmente, isso não afeta a pontuação de ninguém.
+
+**3. Os ticks durante a música** (o modelo que você descreveu)
+- Cada máquina junta os `GameInput` dos jogadores locais e envia um `InputBatch` a cada **~50 ms**, mesmo que esteja vazio.
+- Cada lote leva uma **marca d'água**: "já enviei todos os inputs até o tempo `t`".
+- A cada ~1 s também vai um `StatsCheckpoint` com o placar real do jogador: score, combo, multiplicador e star power.
+
+**4. Pista remota**
+- O jogador remoto funciona como um replay, mas a engine dele só avança até **`min(SongTime − D, marca d'água)`**, com **D ≈ 200 ms** e configurável.
+- A pista dele também é desenhada em `VisualTime − D`. Assim notas e acertos ficam alinhados na pista dele, que só aparece ~200 ms "atrasada".
+- Essa espera é necessária porque o loop atual (`BasePlayer.UpdateInputs`) só aplica inputs com tempo menor ou igual ao atual. Um input que chegasse depois de a engine já ter passado daquele tempo seria julgado errado.
+- Se houver um pico de lag, a pista remota congela e depois acelera até alcançar o tempo certo. A sua pista e o seu áudio nunca esperam por ninguém.
+- Erros do jogador remoto também silenciam o stem do instrumento dele, como no multiplayer local, só que com o atraso D.
+
+**5. Banda e resultados**
+- O `EngineManager` de cada cliente calcula a banda com as engines locais e as remotas.
+- Na tela de resultados, os stats de cada jogador vêm do último `StatsCheckpoint` ou do `Finished` que ele mesmo mandou. Se a simulação local divergir, isso só aparece no log, sem corrigir nada.
+
+**6. Pausa e saídas**
+- No online não há pausa de verdade. A tecla de pause abre um menu com "Sair da partida" e a música continua.
+- Se um cliente sai, o jogador dele "senta" (como `SittingOut`) e o resto continua.
+- Se o host sai, a sessão termina para todos e eles voltam ao menu com um aviso.
+
+--- CLAUDE (pergunta) ---
+A Seção 2 (fluxo de dados) está certa?
+  - Sim, próxima seção: Seguir para tratamento de erros e testes.
+  - Quero ajustar: Mudar algo (ex.: pausa, atraso D, saída do host). Explique em Other.
+
+--- USUÁRIO (resposta) ---
+Sim, próxima seção
+
+[executou comando: Check test frameworks and dotnet availability]
+
+--- CLAUDE ---
+## Seção 3: Erros e testes
+
+**Tratamento de erros**
+- **Versões diferentes:** o `Hello` leva a versão do protocolo e a do jogo. Se não baterem, a conexão é recusada com a mensagem "versão incompatível: host X, você Y".
+- **Timeout:** se passar 5 s sem nenhuma mensagem (os pings mantêm a conexão viva), o par é considerado desconectado e entra a regra de saída da Seção 2.
+- **Transferência:**
+  - Se a conexão cair no meio, o arquivo parcial é apagado.
+  - Se o hash do chart não bater depois de montar a música, o cliente tenta mais uma vez. Se falhar de novo, o jogador fica como "sem a música" e só assiste àquela partida.
+- **Segurança da extração:** o zip vem de outra máquina, então:
+  - entradas com `..` ou caminho absoluto são rejeitadas;
+  - há um limite de tamanho total (configurável, ~2 GB);
+  - só são aceitas extensões de música, chart e imagem.
+- **Mensagem malformada ou grande demais:** a conexão daquele par cai e o log registra o motivo.
+- **Instrumento ou dificuldade que o chart não tem:** o lobby valida antes do start e pede para o jogador trocar.
+
+**Testes**
+1. **Unitários (Unity Test Runner, EditMode, NUnit):**
+   - serialização de cada mensagem, ida e volta;
+   - montagem das mensagens no TCP, inclusive mensagens partidas;
+   - empacotar e extrair a música, incluindo a rejeição de zips maliciosos;
+   - cálculo do `ClockSync`;
+   - buffer da marca d'água.
+2. **Teste de determinismo:** pegar um replay real, passar os inputs dele pelo caminho do jogador remoto com um transporte falso que adiciona atraso, jitter e lotes fora de ritmo, e conferir que os stats finais são **idênticos** aos do replay. É esse teste que garante que a pista remota é fiel.
+3. **`LaggyTransport`:** um transporte que envolve outro e simula latência e jitter. Serve para o teste 2 e para testar à mão.
+4. **Manual:**
+   - duas instâncias na mesma máquina (`localhost`);
+   - depois duas máquinas via Tailscale;
+   - checklist: lobby, transferência de pasta e de `.sng`, start sincronizado, pista remota, saída de um cliente e saída do host.
+
+O `dotnet` não está instalado nesta máquina, então os testes rodam pelo Test Runner do Unity.
+
+--- CLAUDE (pergunta) ---
+A Seção 3 (erros e testes) está certa? Se sim, escrevo a spec completa.
+  - Sim, escrever a spec: Salvo em docs/superpowers/specs/ e faço commit numa branch nova.
+  - Quero ajustar: Mudar algo nos erros ou testes. Explique em Other.
+
+--- USUÁRIO (resposta) ---
+Sim, escrever a spec
+
+[executou comando: Create feature branch and specs folder]
+
+[escreveu arquivo: /home/felipeserver/repos/YARG/docs/superpowers/specs/2026-10-30-online-multiplayer-design.md]
+
+[executou comando: Commit the design spec]
+
+--- CLAUDE ---
+Escrevi a spec do multiplayer em [2026-10-30-online-multiplayer-design.md](docs/superpowers/specs/2026-10-30-online-multiplayer-design.md), numa branch nova, `feature/online-multiplayer`. Ainda não escrevi nenhum código.
+
+**Não consegui fazer o commit:** o git desta máquina não tem nome e email configurados. Deixei o arquivo adicionado (em stage). Para commitar, configure assim:
+
+```bash
+git config --global user.name "Seu Nome"
+```
+
+```bash
+git config --global user.email "felipeflohrlol@gmail.com"
+```
+
+Se preferir, me diga o nome que eu configuro só neste repositório.
+
+**O que está na spec:**
+- **Rede:** o host hospeda e os outros conectam pelo IP Tailscale dele, via TCP. A conexão fica atrás de uma interface, então o port para o navegador vira só um transporte WebSocket novo.
+- **Pistas dos outros:** funcionam como um "replay ao vivo". A cada ~50 ms cada máquina manda os inputs do jogador dela, e a pista remota roda cerca de 200 ms atrás. É a sincronização "de ticks em ticks" que você descreveu.
+- **Banda co-op:** aproveita o placar de banda e o star power que o jogo já calcula no multiplayer local.
+- **Músicas:** quem tem ou não a música é decidido pelo hash do chart. O host envia pastas ini (em zip) e arquivos `.sng`, e a extração tem proteções contra arquivos maliciosos.
+- **Downloads:** uma configuração escolhe entre guardar as músicas baixadas numa pasta que o jogador define ou usar uma pasta temporária, apagada ao sair.
+- **Ordem sugerida:** primeiro rede e protocolo, depois lobby, pistas remotas, banda e resultados, e por último o compartilhamento de músicas.
+
+Uma coisa a pensar: o `origin` deste repositório aponta para o `YARC-Official/YARG`. Quando for publicar o fork, crie o seu repositório no GitHub e aponte o remote para ele.
+
+--- USUÁRIO ---
+Aprovada, fazer plano
+
+[usou a skill: superpowers:writing-plans]
+
+--- CLAUDE ---
+Vou usar a skill writing-plans para montar o plano de implementação. Antes, preciso levantar no código as assinaturas exatas que o plano vai usar.
+
+[executou comando: Check asmdefs, GameInput and serialization APIs]
+
+[executou comando: Inspect replay frame serialization and replay player setup]
+
+[executou comando: Find player creation and replay version constants]
+
+[executou comando: Inspect GameManager player loading and FixedArrayStream API]
+
+[executou comando: Inspect SongContainer and CacheHandler APIs]
+
+[executou comando: Inspect song refresh flow]
+
+--- CLAUDE ---
+Ainda estou levantando as assinaturas no código. Falta ver como as configurações e os diálogos são criados, e aí começo a escrever o plano.
+
+[executou comando: Inspect settings, dialog manager and global state]
+
+[executou comando: Inspect main menu, list dialog and persistent state]
+
+[executou comando: Find gameplay scene load points and profile fields]
+
+[executou comando: Inspect song start flow in menu and GameManager]
+
+[executou comando: Inspect GameManager loading tail and SongRunner API]
+
+[executou comando: Inspect input recording, update loop and score saving]
+
+--- CLAUDE ---
+Já levantei quase tudo: onde os inputs são gravados, como os replays são carregados e como a música começa. Falta conferir só a API que monta um replay por jogador.
+
+[executou comando: Find replay frame construction and path helpers]
+
+[executou comando: Check test framework package and Unity install]
+
+[executou comando: Check target frameworks and test project layout]
+
+[executou comando: Find settings tab registration and file browser usage]
+
+[executou comando: Inspect settings tabs, setting types and file explorer helper]
+
+[executou comando: Inspect button setting and localization format]
+
+--- CLAUDE ---
+Terminei de levantar as interfaces. Agora vou conferir dois detalhes (o tamanho do hash e a versão do jogo) e escrever o plano.
+
+[executou comando: Check hash size and game version constant]
+
+[executou comando: Check song part availability API]
+
+[executou comando: Inspect PartValues API]
+
+[editou arquivo: /home/felipeserver/repos/YARG/docs/superpowers/specs/2026-10-30-online-multiplayer-design.md]
+
+[editou arquivo: /home/felipeserver/repos/YARG/docs/superpowers/specs/2026-10-30-online-multiplayer-design.md]
+
+[editou arquivo: /home/felipeserver/repos/YARG/docs/superpowers/specs/2026-10-30-online-multiplayer-design.md]
+
+[editou arquivo: /home/felipeserver/repos/YARG/docs/superpowers/specs/2026-10-30-online-multiplayer-design.md]
+
+[executou comando: Check constructors usable in tests]
+
+[executou comando: Find engine preset factory for guitar params]
+
+[executou comando: Inspect engine parameter creation and entry types]
+
+[executou comando: Read rest of CreatePlayers]
+
+[executou comando: Check dialog, toast, score screen and IntSetting APIs]
+
+[executou comando: Check localization helpers and languages]
+
+[escreveu arquivo: /home/felipeserver/repos/YARG/docs/superpowers/plans/2026-10-30-online-multiplayer.md]
+
+--- CLAUDE ---
+Plano escrito; fazendo a revisão final contra a spec e corrigindo três pontos.
+
+[editou arquivo: /home/felipeserver/repos/YARG/docs/superpowers/plans/2026-10-30-online-multiplayer.md]
+
+[editou arquivo: /home/felipeserver/repos/YARG/docs/superpowers/plans/2026-10-30-online-multiplayer.md]
+
+[editou arquivo: /home/felipeserver/repos/YARG/docs/superpowers/plans/2026-10-30-online-multiplayer.md]
+
+[editou arquivo: /home/felipeserver/repos/YARG/docs/superpowers/plans/2026-10-30-online-multiplayer.md]
+
+[executou comando: Stage spec and plan documents]
+
+--- CLAUDE ---
+O plano de implementação está em [2026-10-30-online-multiplayer.md](docs/superpowers/plans/2026-10-30-online-multiplayer.md). Os dois documentos estão adicionados (em stage) na branch `feature/online-multiplayer`, mas sem commit, porque o git desta máquina ainda não tem nome e email configurados.
+
+**Como o plano está organizado:**
+- **Tarefas 1 a 7: núcleo em C# puro.** Fica em `Assets/Script/Multiplayer/Core/`, numa assembly própria sem Unity, com testes NUnit rodando por `dotnet test`. Cobre a montagem das mensagens no TCP, o protocolo, os transportes (TCP, em memória e com lag simulado), a sincronização de relógio, o buffer de inputs remotos com teste de fidelidade, as sessões host e cliente e a transferência de músicas com extração segura.
+- **Tarefas 8 a 10: integração com o jogo.**
+  - Configurações e o gerenciador do multiplayer.
+  - Jogadores remotos no gameplay.
+  - Menus de hospedar e entrar, lobby e escolha de parte, feitos com os diálogos que o jogo já tem.
+- **Tarefa 11:** checklist ponta a ponta, primeiro em `localhost` e depois via Tailscale.
+
+**Mudanças que fiz na spec ao levantar o código:**
+- **Duas novas mensagens:** `BeginLoad` e `ReturnToLobby`, para o host mandar todos carregarem a música e voltarem ao lobby.
+- **Nova mensagem `PlayerSetup`:** sem ela a engine remota não reproduz a do outro jogador. Cada máquina só conhece os parâmetros de engine depois de criar o próprio jogador, então o carregamento passa a ter duas fases: cria o jogador local, troca os setups e depois cria os remotos.
+- **Falha desativada no online:** senão cada cliente encerraria a música sozinho.
+- **Scores dos remotos:** não são gravados no seu banco de scores local.
+- **Testes:** rodam via `dotnet test`, porque o projeto não tem o Unity Test Framework. O teste de "stats idênticos" virou um teste de que a engine remota recebe exatamente os mesmos inputs, na mesma ordem e a tempo. A igualdade dos stats segue disso, porque a engine é determinística.
+
+**O que você vai precisar fazer:**
+- **Instalar o .NET SDK 10** nesta máquina para rodar os testes.
+- **Abrir o projeto na Unity a partir da tarefa 8.** Aqui não há editor instalado, então essas tarefas só podem ser verificadas aí.
+- **Criar o botão de Multiplayer no menu principal pelo editor.** É o único passo do plano que não dá para fazer por código.
+
+**Formas de execução:**
+- **Native:** eu implemento tudo nesta sessão e, no fim, um revisor independente confere a branch inteira. É mais barato e mais rápido.
+- **Subagent-driven:** cada tarefa é feita por um agente novo e revisada antes da próxima. É mais caro, porém mais rigoroso.
+
+Recomendo **Native**. As tarefas 1 a 7 dependem muito das interfaces umas das outras e são bem cobertas por testes. As tarefas 8 a 10 vão precisar da sua verificação no editor da Unity de qualquer forma, então revisar cada tarefa isoladamente acrescenta pouco.
+
+--- USUÁRIO ---
+Exporte a conversa pra um arquivo txt pra deixar marcada a nossa conversa
+
+[executou comando: Locate this session's transcript file]
+
+[executou comando: Inspect transcript record structure]
+
+[escreveu arquivo: /tmp/claude-1000/-home-felipeserver-repos-YARG/bfe5bd00-7c3a-42f5-9813-801118c67d1d/scratchpad/transcript_to_txt.py]
+
+[executou comando: Convert transcript to text file and check speakers]
+
+--- CLAUDE ---
+Não consegui gerar o arquivo da conversa.
+
+- **Exportação do app:** o app recusou, porque ela grava o zip no seu computador e esta sessão roda no servidor, sem acesso a ele.
+- **Plano B:** tentei converter o histórico salvo da sessão (`~/.claude/projects/.../bfe5bd00-....jsonl`) em txt dentro do repositório. A ação foi bloqueada pela regra de permissões do modo automático, que protege dados sensíveis, e eu não quis contornar o bloqueio.
+
+Há duas formas de resolver:
+
+1. **Pelo app:** no menu da sessão, use **Export**. Você recebe um zip com a transcrição na pasta Downloads.
+2. **Gerar o txt você mesmo:** deixei pronto o script `/tmp/claude-1000/-home-felipeserver-repos-YARG/bfe5bd00-7c3a-42f5-9813-801118c67d1d/scratchpad/transcript_to_txt.py`. Ele inclui as suas mensagens, as minhas respostas, as perguntas com as opções e as suas respostas, e uma linha curta para cada ação (comando executado, arquivo escrito). Rode no terminal:
+
+```bash
+mkdir -p /home/felipeserver/repos/YARG/docs/superpowers/conversations
+```
+
+```bash
+python3 -I /tmp/claude-1000/-home-felipeserver-repos-YARG/bfe5bd00-7c3a-42f5-9813-801118c67d1d/scratchpad/transcript_to_txt.py ~/.claude/projects/-home-felipeserver-repos-YARG/bfe5bd00-7c3a-42f5-9813-801118c67d1d.jsonl /home/felipeserver/repos/YARG/docs/superpowers/conversations/2026-10-30-conversa-multiplayer.txt
+```
+
+O arquivo fica em `docs/superpowers/conversations/2026-10-30-conversa-multiplayer.txt`. A pasta de rascunho (scratchpad) é temporária, então rode logo. Se quiser que eu mesmo faça isso nas próximas vezes, adicione uma regra de permissão para esse tipo de comando nas configurações do Claude Code.
+
+A spec e o plano continuam em stage na branch `feature/online-multiplayer`, esperando você configurar a identidade do git e escolher a forma de execução: Native ou Subagent-driven.
+
+--- USUÁRIO ---
+A sessão não tem permissão?
+
+--- CLAUDE ---
+A sessão tem permissão, sim, e faz quase tudo normalmente: leu o código, criou a branch e escreveu a spec e o plano. Só aquela ação foi bloqueada.
+
+Esta sessão roda no **modo automático**. Nele, cada comando passa por um verificador que decide sozinho se pode rodar sem te perguntar. Ele barrou o comando por **"Sensitive-Source Provenance"**: o comando lia o arquivo de histórico das sessões do Claude (`~/.claude/projects/...jsonl`) e copiava o conteúdo para dentro do repositório. Esses arquivos ficam fora do projeto e podem ter dados sensíveis, então o verificador não deixa movê-los automaticamente. Como foi um bloqueio de segurança, preferi não tentar outro caminho para fazer a mesma coisa.
+
+Para liberar, há três opções:
+
+1. **Rodar você mesmo** os dois comandos da mensagem anterior no terminal. É o mais rápido, e nada impede você de ler os seus próprios arquivos.
+2. **Adicionar uma regra de permissão** no `settings.json` do Claude Code (o do projeto, `.claude/settings.json`, ou o global, `~/.claude/settings.json`) para esse comando. Posso escrever essa regra se você me pedir. O comando `/permissions` não funciona aqui no app, só num terminal com `claude` interativo.
+3. **Trocar o modo de permissão da sessão** para um modo que pergunte antes de executar, em vez de decidir sozinho. Aí o comando apareceria para você aprovar.
+
+--- USUÁRIO ---
+Mas eu aprovo. Pode seguir
+

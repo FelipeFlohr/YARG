@@ -1,7 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading;
+using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using YARG.Audio;
+using YARG.Core.Audio;
 using YARG.Core.Chart;
 using YARG.Core.Input;
 using YARG.Menu.Navigation;
@@ -11,6 +15,8 @@ namespace YARG.Gameplay.HUD
 {
     public class PracticeSectionMenu : GameplayBehaviour
     {
+        protected override bool DisableUntilSongStarts => false;
+
         private const int SECTION_VIEW_EXTRA = 10;
         private const float SCROLL_TIME = 1f / 60f;
 
@@ -31,6 +37,8 @@ namespace YARG.Gameplay.HUD
         private GameObject _sectionViewPrefab;
 
         private readonly List<PracticeSectionView> _sectionViews = new();
+
+        private readonly PreviewPlayer _previewPlayer = new();
 
         private int _hoveredIndex;
         public int HoveredIndex
@@ -59,6 +67,7 @@ namespace YARG.Gameplay.HUD
                 }
 
                 UpdateSectionViews();
+                UpdatePreviewAudio();
             }
         }
 
@@ -109,6 +118,13 @@ namespace YARG.Gameplay.HUD
                 Navigator.Instance.PopScheme();
                 _navigationPushed = false;
             }
+
+            _ = _previewPlayer.StopPreview();
+        }
+
+        protected override void GameplayDestroy()
+        {
+            _previewPlayer.Dispose();
         }
 
         protected override void OnChartLoaded(SongChart chart)
@@ -126,6 +142,7 @@ namespace YARG.Gameplay.HUD
             LastSelectedIndex = null;
             RegisterNavigationScheme();
             UpdateSectionViews();
+            UpdatePreviewAudio();
         }
 
         private void UpdateSectionViews()
@@ -140,7 +157,7 @@ namespace YARG.Gameplay.HUD
         {
             if (_navigationPushed) return;
 
-            Navigator.Instance.PushScheme(new NavigationScheme(new()
+            _ = Navigator.Instance.PushScheme(new NavigationScheme(new()
             {
                 new NavigationScheme.Entry(MenuAction.Green, "Menu.Common.Confirm", Confirm),
                 new NavigationScheme.Entry(MenuAction.Red, "Menu.Common.Back", Back),
@@ -156,6 +173,33 @@ namespace YARG.Gameplay.HUD
 
 
             _navigationPushed = true;
+        }
+
+        private void UpdatePreviewAudio()
+        {
+            const double FADE_DURATION = 1.25;
+            const double PREVIEW_SCROLL_DELAY = .6f;
+            float previewVolume = SettingsManager.Settings.PreviewVolume.Value;
+
+            if (previewVolume == 0)
+            {
+                return;
+            }
+
+            var section = _sections[HoveredIndex];
+            var startTime = section.Time;
+            var length = section.TimeLength;
+
+            _ = _previewPlayer.StopPreview();
+            _ = _previewPlayer.StartPreview(
+                GameManager.Song,
+                previewVolume,
+                GlobalVariables.State.SongSpeed,
+                PREVIEW_SCROLL_DELAY,
+                FADE_DURATION,
+                SettingsManager.Settings.CensorMatureContent.Value,
+                startTime,
+                length);
         }
 
         private void Confirm()
@@ -210,7 +254,8 @@ namespace YARG.Gameplay.HUD
                 return;
             }
 
-            var delta = Mouse.current.scroll.ReadValue().y * Time.unscaledDeltaTime;
+            var scroll = Mouse.current?.scroll.ReadValue().y ?? 0f;
+            var delta = scroll * Time.unscaledDeltaTime;
 
             if (delta > 0f)
             {

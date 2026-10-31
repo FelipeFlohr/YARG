@@ -278,12 +278,18 @@ namespace YARG.Song
         {
             if (filter.Attribute == SortAttribute.Unspecified)
             {
-                List<SongEntry> entriesToSearch = new();
+                // A song can be listed under several categories (e.g. instrument sorts); search each once
+                var entriesToSearch = new HashSet<SongEntry>();
                 foreach (var entry in searchList)
                 {
-                    entriesToSearch.AddRange(entry.Songs);
+                    entriesToSearch.UnionWith(entry.Songs);
                 }
                 return new SongCategory[] { new("Search Results", UnspecifiedSearch(filter, entriesToSearch), null)};
+            }
+
+            if (filter.Attribute == SortAttribute.AggregateDrums)
+            {
+                return SearchAggregateDrums(filter, searchList);
             }
 
             if (filter.Attribute >= SortAttribute.FiveFretGuitar)
@@ -495,7 +501,7 @@ namespace YARG.Song
             }
         }
 
-        private static SongEntry[] UnspecifiedSearch(FilterNode filter, List<SongEntry> songs)
+        private static SongEntry[] UnspecifiedSearch(FilterNode filter, IReadOnlyCollection<SongEntry> songs)
         {
             var nodes = new List<UnspecifiedSortNode>(songs.Count);
             Parallel.ForEach(songs, song =>
@@ -505,7 +511,9 @@ namespace YARG.Song
                 {
                     lock (nodes)
                     {
-                        nodes.Insert(~nodes.BinarySearch(node), node);
+                        // Distinct songs can compare equal (identical metadata and location); BinarySearch then returns >= 0
+                        int index = nodes.BinarySearch(node);
+                        nodes.Insert(index < 0 ? ~index : index, node);
                     }
                 }
             });
@@ -520,17 +528,23 @@ namespace YARG.Song
 
         private static SongCategory[] SearchInstrument(FilterNode filter, SongCategory[] searchList)
         {
-            var songsToMatch = SongContainer.Instruments[filter.Attribute.ToInstrument()]
-                .Where(node =>
-                {
-                    string key = node.Key.ToString();
-                    if (!key.StartsWith(filter.Argument))
-                    {
-                        return false;
-                    }
-                    return key.Length == filter.Argument.Length || filter.Mode != SearchMode.Exact;
-                })
-                .SelectMany(node => node.Value);
+            // Free Harmony uses the harmony part when present, or lead vocals for solo-only songs.
+            // The Core instrument index only contains harmony parts, so it cannot supply this filter.
+            IEnumerable<SongEntry> songsToMatch = filter.Attribute == SortAttribute.FreeHarmony
+                ? searchList.SelectMany(node => node.Songs).Where(song => song.HasInstrument(Instrument.PartyVocals) &&
+                    MatchesIntensity(song[Instrument.Harmony].IsActive()
+                        ? song[Instrument.Harmony].Intensity
+                        : song[Instrument.Vocals].Intensity, filter))
+                : SongContainer.Instruments[filter.Attribute.ToInstrument()]
+                    .Where(node => MatchesIntensity(node.Key, filter))
+                    .SelectMany(node => node.Value);
+
+            static bool MatchesIntensity(int intensity, FilterNode filter)
+            {
+                string key = intensity.ToString();
+                return key.StartsWith(filter.Argument) &&
+                    (key.Length == filter.Argument.Length || filter.Mode != SearchMode.Exact);
+            }
 
             var result = new SongCategory[searchList.Length];
             int count = 0;
@@ -541,6 +555,30 @@ namespace YARG.Song
                 {
                     result[count++] = new SongCategory(node.Category, songs, node.CategoryGroup);
                 }
+            }
+            return result[..count];
+        }
+
+        private static SongCategory[] SearchAggregateDrums(FilterNode filter, SongCategory[] searchList)
+        {
+            var songsToMatch = SongContainer.AggregateDrums
+                .Where(node =>
+                {
+                    string key = node.Key.ToString();
+                    if (!key.StartsWith(filter.Argument))
+                        return false;
+                        
+                    return key.Length == filter.Argument.Length || filter.Mode != SearchMode.Exact;
+                })
+                .SelectMany(node => node.Value);
+
+            var result = new SongCategory[searchList.Length];
+            int count = 0;
+            foreach (var node in searchList)
+            {
+                var songs = node.Songs.Intersect(songsToMatch).ToArray();
+                if (songs.Length > 0)
+                    result[count++] = new SongCategory(node.Category, songs, node.CategoryGroup);
             }
             return result[..count];
         }

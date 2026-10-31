@@ -34,17 +34,43 @@ namespace YARG.Menu.MusicLibrary
         private TextMeshProUGUI _sortInfoHeaderStarCountText;
         [SerializeField]
         private Image _sortInfoHeaderStarIcon;
+        [SerializeField]
+        private Sprite _starGoldSprite;
+        [SerializeField]
+        private Sprite _starWhiteSprite;
         private int _totalSongCount = 0;
         private int _totalSongCountUnfiltered = 0;
         private int _totalStarCount = 0;
+        private bool _allVisibleSongsGold = false;
         private int _numPlaylists = 0;
 
         public bool HasSortHeaders { get; private set; }
 
-        private SongCategory[] _sortedSongs;
-        private SortAttribute _playlistSort = SortAttribute.Name;
-        private bool _playlistSortAscending = true;
-        private static readonly Dictionary<SortAttribute, HashSet<SongCategory>> _collapsedHeaders = new();
+        public void GetSortHeaderCollapseState(out bool hasCollapsed, out bool hasExpanded)
+        {
+            hasCollapsed = false;
+            hasExpanded = false;
+
+            if (_sortedSongs is null) return;
+
+            var collapsedHeaders = _collapsedHeaders[SettingsManager.Settings.LibrarySort];
+            foreach (var section in _sortedSongs)
+            {
+                if (collapsedHeaders.Contains(section))
+                {
+                    hasCollapsed = true;
+                }
+                else
+                {
+                    hasExpanded = true;
+                }
+
+                if (hasCollapsed && hasExpanded) return;
+            }
+        }
+
+        protected SongCategory[] _sortedSongs;
+        protected static readonly Dictionary<SortAttribute, HashSet<SongCategory>> _collapsedHeaders = new();
 
         private List<int> _sectionHeaderIndices = new();
         private int _primaryHeaderIndex;
@@ -89,14 +115,16 @@ namespace YARG.Menu.MusicLibrary
                 return;
             }
 
-            if (SongContainer.Count > RecommendedSongs.RECOMMEND_SONGS_COUNT)
-            {
-                _recommendedSongs = RecommendedSongs.GetRecommendedSongs();
-            }
-            else
-            {
-                _recommendedSongs = null;
-            }
+            var recommendationSetting = SettingsManager.Settings.NumberOfRecommendations;
+            int maximumRecommendationCount = Mathf.Max(0, SongContainer.Count - 1);
+            int recommendationCount = recommendationSetting.Value >= maximumRecommendationCount
+                ? maximumRecommendationCount
+                : (int) recommendationSetting.Value;
+            recommendationSetting.SetValueWithoutNotify(recommendationCount);
+
+            var recommendations = RecommendedSongs.GetRecommendedSongs(
+                YARG.Menu.Filters.FiltersMenu.ActiveFilterPredicate, recommendationCount);
+            _recommendedSongs = recommendations.Length > 0 ? recommendations : null;
         }
 
         private void UpdateSearch(bool force)
@@ -113,7 +141,7 @@ namespace YARG.Menu.MusicLibrary
             {
                 _sortedSongs = _searchField.Search(SettingsManager.Settings.LibrarySort);
                 // _sortedSongs = ApplyCollapsedSectionsForCurrentSort(_sortedSongs);
-                _searchField.gameObject.SetActive(true);
+                _searchField.gameObject.SetActive(MenuState == MenuState.Library);
             }
             else
             {
@@ -202,11 +230,13 @@ namespace YARG.Menu.MusicLibrary
                 }
             }
 
-            // keep selection stable when the search text changes
+            // Keep selection stable when the search text changes. Only text entered directly into
+            // the search field should jump to the top; clickable shortcuts use a forced update and
+            // always include the song they were invoked from.
             if (!PlaylistMode && searchChanged)
             {
                 // jump to top when tightening search (adding characters)
-                if (searchExpanded)
+                if (searchExpanded && !force)
                 {
                     _currentSong = null;
                     int targetIndex = 0;
@@ -228,7 +258,7 @@ namespace YARG.Menu.MusicLibrary
                         OnSelectedIndexChanged();
                     }
                 }
-                // jump to most recent song when widening search (removing characters)
+                // Keep the current song selected when widening search or applying a clickable shortcut.
                 else if (previousSelectedSong != null)
                 {
                     if (!SetIndexTo(i => i is SongViewType view && view.SongEntry == previousSelectedSong, _primaryHeaderIndex))
@@ -246,6 +276,13 @@ namespace YARG.Menu.MusicLibrary
             if (ViewList.Count == 0)
             {
                 _currentSong = null;
+                return;
+            }
+
+            // Playlists and Recommended entries are not subject to song filters, so a selection
+            // sitting on one of them is never invalidated by a filter change.
+            if (CurrentSelection is ButtonViewType)
+            {
                 return;
             }
 
@@ -283,13 +320,15 @@ namespace YARG.Menu.MusicLibrary
             }
 
             SortAttribute nextSort;
-            if (SettingsManager.Settings.LibrarySort >= SortAttribute.Playable)
+            if (SettingsManager.Settings.LibrarySort >= SortAttribute.Random)
             {
                 nextSort = SortAttribute.Name;
             }
             else
             {
                 nextSort = (SortAttribute) ((int) SettingsManager.Settings.LibrarySort + 1);
+                if (nextSort == SortAttribute.Playable)
+                    nextSort = SortAttribute.Random;
             }
 
             ChangeSort(nextSort);
@@ -310,7 +349,7 @@ namespace YARG.Menu.MusicLibrary
 
             // Keep the previous sort attribute, too, so it can be used to
             // sort the list of unplayed songs and possibly for other things
-            if (sort != SortAttribute.Playcount && sort != SortAttribute.Stars)
+            if (!IsDynamicScoreSort(sort))
             {
                 SettingsManager.Settings.PreviousLibrarySort = sort;
             }
@@ -321,44 +360,27 @@ namespace YARG.Menu.MusicLibrary
 
         public void ApplySortFromPopup(SortAttribute sort, bool ascending = true)
         {
-            if (MenuState == MenuState.Playlist && SelectedPlaylist != null)
+            var playlist = MenuState == MenuState.Show ? ShowPlaylist : SelectedPlaylist;
+            if ((MenuState == MenuState.Playlist || MenuState == MenuState.Show) && playlist != null)
             {
                 switch (sort)
                 {
                     case SortAttribute.Name:
-                        SelectedPlaylist.SortByName(ascending);
+                        playlist.SortByName(ascending);
                         break;
                     case SortAttribute.Artist:
-                        SelectedPlaylist.SortByArtist(ascending);
+                        playlist.SortByArtist(ascending);
                         break;
                     default:
                         ToastManager.ToastWarning("Sort not supported in playlists");
                         return;
                 }
 
-                _playlistSort = sort;
-                _playlistSortAscending = ascending;
                 RefreshAndReselect();
                 return;
             }
 
             ChangeSort(sort);
-        }
-
-        public SortAttribute GetPopupSortAttribute()
-        {
-            return MenuState == MenuState.Playlist ? _playlistSort : SettingsManager.Settings.LibrarySort;
-        }
-
-        public string GetPopupSortLabel()
-        {
-            var sort = GetPopupSortAttribute().ToLocalizedName();
-            if (MenuState != MenuState.Playlist)
-            {
-                return sort;
-            }
-
-            return _playlistSortAscending ? $"{sort} (A-Z)" : $"{sort} (Z-A)";
         }
 
         private void UpdateSortInformationHeader()
@@ -372,7 +394,7 @@ namespace YARG.Menu.MusicLibrary
                         MenuData.Colors.HeaderSecondary,
                         700);
                 }
-                else if (SettingsManager.Settings.LibrarySort < SortAttribute.Instrument)
+                else
                 {
                     var sortingBy = TextColorer.StyleString("SORTED BY ",
                         MenuData.Colors.HeaderTertiary,
@@ -383,18 +405,6 @@ namespace YARG.Menu.MusicLibrary
                         700);
 
                     _sortInfoHeaderPrimaryText.text = ZString.Concat(sortingBy, sortKey);
-                }
-                else
-                {
-                    var playableSongs = TextColorer.StyleString("PLAYABLE ON ",
-                        MenuData.Colors.HeaderTertiary,
-                        600);
-
-                    var sortKey = TextColorer.StyleString(SettingsManager.Settings.LibrarySort.ToLocalizedName(),
-                        MenuData.Colors.HeaderSecondary,
-                        700);
-
-                    _sortInfoHeaderPrimaryText.text = ZString.Concat(playableSongs, sortKey);
                 }
 
                 string countText;
@@ -430,6 +440,9 @@ namespace YARG.Menu.MusicLibrary
                     600);
 
                 _sortInfoHeaderStarCountText.text = ZString.Concat(obtainedStars, totalStars);
+                _sortInfoHeaderStarIcon.sprite = _allVisibleSongsGold && _totalSongCount > 0
+                    ? _starGoldSprite
+                    : _starWhiteSprite;
                 _sortInfoHeaderStarIcon.color = _sortInfoHeaderStarIcon.color.WithAlpha(1);
             }
             else if (MenuState == MenuState.PlaylistSelect)
@@ -454,11 +467,14 @@ namespace YARG.Menu.MusicLibrary
                 _sortInfoHeaderStarCountText.text = "";
                 _sortInfoHeaderStarIcon.color = _sortInfoHeaderStarIcon.color.WithAlpha(0);
             }
-            else if (MenuState == MenuState.Playlist)
+            else if (MenuState == MenuState.Playlist || MenuState == MenuState.Show)
             {
+                string playlistName = MenuState == MenuState.Show
+                    ? Localize.Key("Menu.MusicLibrary.PlayShow")
+                    : GetPlaylistDisplayName(SelectedPlaylist);
                 _sortInfoHeaderPrimaryText.text = ZString.Concat(
                     TextColorer.StyleString("PLAYLIST ", MenuData.Colors.HeaderTertiary, 600),
-                    TextColorer.StyleString(GetPlaylistDisplayName(SelectedPlaylist), MenuData.Colors.HeaderSecondary, 700));
+                    TextColorer.StyleString(playlistName, MenuData.Colors.HeaderSecondary, 700));
 
                 var countText = TextColorer.StyleString(ZString.Format("{0:N0}", _totalSongCount),
                     MenuData.Colors.HeaderSecondary, 500);
@@ -476,6 +492,9 @@ namespace YARG.Menu.MusicLibrary
                     MenuData.Colors.HeaderTertiary,
                     600);
                 _sortInfoHeaderStarCountText.text = ZString.Concat(obtainedStars, totalStars);
+                _sortInfoHeaderStarIcon.sprite = _allVisibleSongsGold && _totalSongCount > 0
+                    ? _starGoldSprite
+                    : _starWhiteSprite;
                 _sortInfoHeaderStarIcon.color = _sortInfoHeaderStarIcon.color.WithAlpha(1);
             }
         }
@@ -507,12 +526,12 @@ namespace YARG.Menu.MusicLibrary
             UpdateSearch(true);
         }
 
-        private void OpenFilters()
+        public void OpenFilters()
         {
             // Stop any library preview audio so the Filters menu doesn't inherit it
             StopPreview();
 
-            var menu = YARG.Menu.Filters.FiltersMenu.Instance;
+            var menu = Filters.FiltersMenu.Instance;
             if (menu == null)
                 return;
 
@@ -522,7 +541,7 @@ namespace YARG.Menu.MusicLibrary
 
         private static bool IsFiltersMenuOpen()
         {
-            var menu = YARG.Menu.Filters.FiltersMenu.Instance;
+            var menu = Filters.FiltersMenu.Instance;
             return menu != null && menu.gameObject.activeInHierarchy;
         }
 

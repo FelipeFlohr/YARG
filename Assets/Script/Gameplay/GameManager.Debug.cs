@@ -1,10 +1,11 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Cysharp.Text;
 using UnityEngine;
 using UnityEngine.InputSystem.LowLevel;
 using YARG.Assets.Script.Gameplay.Player;
+using YARG.Core;
 using YARG.Core.Audio;
 using YARG.Core.Chart;
 using YARG.Core.Extensions;
@@ -94,6 +95,8 @@ namespace YARG.Gameplay
         private string[] _debugMenuTitles;
         private int _debugMenuIndex = -1;
 
+        private Dictionary<int, Difficulty> _debugPlayerDifficulties = new();
+
         // Needed because of non-static methods being used as delegates
         private void InitializeDebug()
         {
@@ -114,6 +117,7 @@ namespace YARG.Gameplay
             {
                 var player = _players[i];
                 debugPlayers.Add($"{i + 1}: {player.Player.Profile.Name}");
+                _debugPlayerDifficulties.Add(i, player.Player.Profile.CurrentDifficulty);
             }
             _debugPlayers = debugPlayers.ToArray();
 
@@ -268,6 +272,8 @@ namespace YARG.Gameplay
 
             var player = _players[_debugSelectedPlayer];
 
+            PlayerDifficultySwap();
+
             using (DebugScrollView.Begin("Base Engine", VerticalGroupStyle,
                 ref _debugBaseEngineScroll, GUILayout.Height(125 * _debugGuiScale)))
             {
@@ -285,7 +291,7 @@ namespace YARG.Gameplay
                     text.Append("- Last queued input time: None\n");
                 text.AppendLine();
                 text.AppendLine("Indexes:");
-                text.AppendFormat("- Note index: {0}\n", engine.NoteIndex);
+                text.AppendFormat("- Note index: {0}/{1}\n", engine.NoteIndex, engine.NoteCount);
                 text.AppendFormat("- Solo index: {0}\n", engine.CurrentSoloIndex);
                 text.AppendFormat("- Star index: {0}\n", engine.CurrentStarIndex);
                 text.AppendFormat("- Countdown index: {0}\n", engine.CurrentWaitCountdownIndex);
@@ -360,6 +366,7 @@ namespace YARG.Gameplay
 
             string playerType = player switch
             {
+                SixFretGuitarPlayer => "Six Fret Guitar",
                 FiveFretGuitarPlayer => "Five Fret Guitar",
                 FiveLaneKeysPlayer => "Five Lane Keys",
                 DrumsPlayer => "Drums",
@@ -521,6 +528,54 @@ namespace YARG.Gameplay
             }
         }
 
+        private bool PlayerDifficultySwap()
+        {
+            if (_debugSelectedPlayer < 0 || _debugSelectedPlayer >= _players.Count)
+            {
+                return false;
+            }
+
+            var player = _players[_debugSelectedPlayer];
+
+            if (player is not TrackPlayer tp)
+            {
+                return false;
+            }
+
+            var lastSelected = _debugPlayerDifficulties[_debugSelectedPlayer];
+
+            GUILayout.BeginVertical("Difficulty Swap", VerticalGroupStyle);
+
+            var instrument = player.Player.Profile.CurrentInstrument;
+
+            var difficulties = new List<string>();
+            foreach (var diff in EnumExtensions<Difficulty>.Values)
+            {
+                if (Song.HasDifficultyForInstrument(instrument, diff))
+                {
+                    difficulties.Add(diff.ToString());
+                }
+            }
+            int difficultyCount = difficulties.Count;
+            int buttonStride = 20 / (difficultyCount - 1);
+            for (int i = 0; i < difficultyCount; i++)
+            {
+                difficulties[i] = EnumExtensions<Difficulty>.Values[i].ToString();
+            }
+
+            _debugPlayerDifficulties[_debugSelectedPlayer] = (Difficulty) GUILayout.SelectionGrid((int) lastSelected, difficulties.ToArray(), difficultyCount);
+            GUILayout.EndVertical();
+
+            var changed = _debugPlayerDifficulties[_debugSelectedPlayer] != lastSelected;
+
+            if (changed)
+            {
+                tp.ChangeDifficulty(_debugPlayerDifficulties[_debugSelectedPlayer]);
+            }
+
+            return changed;
+        }
+
         private Vector2 _debugCalibrationScroll;
         private Vector2 _debugTimeScroll;
         private Vector2 _debugSyncScroll;
@@ -558,11 +613,17 @@ namespace YARG.Gameplay
                 {
                     using var text = ZString.CreateStringBuilder(true);
 
-                    text.AppendFormat("Audio/visual difference: {0:0.000000}\n", _songRunner.SyncDelta);
-                    text.AppendFormat("Resync start delta: {0:0.000000}\n", _songRunner.SyncStartDelta);
-                    text.AppendFormat("Resync worst delta: {0:0.000000}\n", _songRunner.SyncWorstDelta);
-                    text.AppendFormat("Speed adjustment: {0:0.00}\n", _songRunner.SyncSpeedAdjustment);
-                    text.AppendFormat("Speed multiplier: {0}\n", _songRunner.SyncSpeedMultiplier);
+                    text.AppendFormat("Heard sync error: {0:0.000} ms\n", _songRunner.SyncError * 1000.0);
+                    text.AppendFormat("Raw control sync error: {0:0.000} ms\n",
+                        _songRunner.DebugRawControlSyncError * 1000.0);
+                    text.AppendFormat("Control sync error: {0:0.000} ms\n",
+                        _songRunner.DebugControlSyncError * 1000.0);
+                    text.AppendFormat("Control correction start: {0:0.000} ms\n",
+                        _songRunner.DebugSyncStartDelta * 1000f);
+                    text.AppendFormat("Control correction worst: {0:0.000} ms\n",
+                        _songRunner.DebugSyncWorstDelta * 1000f);
+                    text.AppendFormat("Speed adjustment: {0:0.000}\n",
+                        _songRunner.DebugSyncAdjustment);
 
                     GUILayout.Label(text.AsSpan().TrimEnd('\n').ToString());
                 }
@@ -803,6 +864,8 @@ namespace YARG.Gameplay
                         var kind = character is VRMCharacter ? "VRM" : "Built-in";
                         text.AppendFormat("Character Type: {0}\n", kind);
                         text.AppendFormat("Character State: {0}\n", character.CurrentGenericState);
+                        text.AppendFormat("RNG: {0}\n", character.CurrentRng);
+                        text.AppendFormat("RNG at state change: {0}\n", character.RngAtLastTransition);
                         if (character.Type is VenueCharacter.CharacterType.Guitar or VenueCharacter.CharacterType.Bass)
                         {
                             text.AppendFormat("Hand Position: {0}\n", character.CurrentHandPosition);

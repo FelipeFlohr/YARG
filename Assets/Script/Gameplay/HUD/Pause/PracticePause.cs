@@ -38,14 +38,20 @@ namespace YARG.Gameplay.HUD
             base.OnEnable();
 
             // Handle Left/Right via NavigationEvent so they don't appear in the help bar
-            Navigator.Instance.NavigationEvent += OnNavigationEvent;
+            if (Navigator.Instance != null)
+            {
+                Navigator.Instance.NavigationEvent += OnNavigationEvent;
+            }
 
             UpdatePositionText();
         }
 
         protected override void OnDisable()
         {
-            Navigator.Instance.NavigationEvent -= OnNavigationEvent;
+            if (Navigator.Instance != null)
+            {
+                Navigator.Instance.NavigationEvent -= OnNavigationEvent;
+            }
             base.OnDisable();
         }
 
@@ -70,7 +76,8 @@ namespace YARG.Gameplay.HUD
                 return;
             }
 
-            var delta = Mouse.current.scroll.ReadValue().y * Time.unscaledDeltaTime;
+            var scroll = Mouse.current?.scroll.ReadValue().y ?? 0f;
+            var delta = scroll * Time.unscaledDeltaTime;
 
             if (delta > 0f)
             {

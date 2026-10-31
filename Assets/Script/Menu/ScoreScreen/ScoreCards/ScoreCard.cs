@@ -114,9 +114,9 @@ namespace YARG.Menu.ScoreScreen
         private TextMeshProUGUI _offsetHistogramRightAxisLabel;
         private readonly List<RectTransform> _offsetHistogramBarPool = new();
 
-        protected bool IsHighScore;
-        protected T Stats;
-        protected float AverageMultiplier;
+        protected bool  IsHighScore;
+        protected T     Stats;
+        protected bool  IsReplay;
 
         public YargPlayer Player { get; private set; }
 
@@ -125,12 +125,12 @@ namespace YARG.Menu.ScoreScreen
             _colorizer = GetComponent<ScoreCardColorizer>();
         }
 
-        public void Initialize(bool isHighScore, YargPlayer player, T stats, float averageMultiplier)
+        public void Initialize(bool isHighScore, YargPlayer player, T stats, bool isReplay)
         {
             IsHighScore = isHighScore;
             Player = player;
             Stats = stats;
-            AverageMultiplier = averageMultiplier;
+            IsReplay  = isReplay;
         }
 
         public virtual void SetCardContents()
@@ -164,7 +164,7 @@ namespace YARG.Menu.ScoreScreen
                 _colorizer.SetCardColor(ScoreCardColorizer.ScoreCardColor.Gray);
                 ShowTag("Bot");
             }
-            else if (Player.IsReplay)
+            else if (IsReplay)
             {
                 if (Stats.IsFullCombo)
                 {
@@ -187,10 +187,15 @@ namespace YARG.Menu.ScoreScreen
                 _colorizer.SetCardColor(ScoreCardColorizer.ScoreCardColor.Blue);
                 ShowTag("High Score");
             }
-            else
+            else if (!GlobalVariables.State.IsReplay)
             {
                 _colorizer.SetCardColor(ScoreCardColorizer.ScoreCardColor.Blue);
                 ShowTag(SettingsManager.Settings.NoFail.Value != NoFailMode.Off ? "Completed" : "Cleared");
+            }
+            else
+            {
+                _colorizer.SetCardColor(ScoreCardColorizer.ScoreCardColor.Blue);
+                _tagGameObject.SetActive(false);
             }
 
             _score.text = Stats.TotalScore.ToString("N0");
@@ -202,7 +207,7 @@ namespace YARG.Menu.ScoreScreen
             _notesMissedContainer.gameObject.SetActive(Stats.NotesMissed != 0);
             _starpowerPhrases.text = $"{ColorizePrimary(Stats.StarPowerPhrasesHit)} / " +
                 $"{ColorizeSecondary(Stats.TotalStarPowerPhrases)}";
-            _averageMultiplier.text = ColorizePrimary(AverageMultiplier.ToString("0.00"));
+            _averageMultiplier.text = ColorizePrimary(Stats.AverageMultiplier.ToString("0.00"));
             _bandBonusScore.text = ColorizePrimary(Stats.BandBonusScore.ToString("N0"));
             _averageOffset.text = $"{ColorizePrimary(Math.Round(Stats.GetAverageOffset() * 1000, MidpointRounding.AwayFromZero))} {ColorizeSecondary("ms")}";
             _starPowerActivations.text = ColorizePrimary(Stats.StarPowerActivationCount);
@@ -254,6 +259,18 @@ namespace YARG.Menu.ScoreScreen
                 icon.InitializeForModifier(modifier);
 
                 nonEngineModifiersUsed = true;
+            }
+
+            // Set player/instrument sprite
+            if (Player.Profile.Avatar == null)
+            {
+                _instrumentIcon.sprite = GetInstrumentSprite();
+                _instrumentIcon.transform.localScale = Vector3.one;
+            }
+            else
+            {
+                _instrumentIcon.sprite = Player.Profile.Avatar.ToSprite();
+                _instrumentIcon.transform.localScale = new Vector3(1f, -1f);
             }
 
             bool anyModifiersUsed = _modifierIconContainer.childCount > 0;
@@ -615,6 +632,8 @@ namespace YARG.Menu.ScoreScreen
             _basicStatsRect.gameObject.SetActive(!showAdvanced);
             ScrollStatsToTop();
         }
+
+        public abstract Sprite GetInstrumentSprite();
     }
 
     public interface IScoreCard<out T> where T : BaseStats
@@ -623,5 +642,6 @@ namespace YARG.Menu.ScoreScreen
         void ScrollStats(float delta);
         void SetCardContents();
         void SetAdvancedStatsShown(bool showAdvanced);
+        Sprite GetInstrumentSprite();
     }
 }

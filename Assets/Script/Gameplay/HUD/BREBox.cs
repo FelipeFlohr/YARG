@@ -1,10 +1,11 @@
-﻿using System;
+using System;
 using System.Collections;
 using DG.Tweening;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using YARG.Core.Engine;
+using YARG.Core.Logging;
 using YARG.Localization;
 
 namespace YARG.Gameplay.HUD
@@ -61,14 +62,17 @@ namespace YARG.Gameplay.HUD
         {
             if (gameObject.activeSelf)
             {
-                return;
+                YargLogger.LogWarning("BREBox is already active! Forcing a reset.");
+                ForceReset();
+            }
+            else
+            {
+                StopCurrentCoroutine();
             }
 
             _manager = manager;
 
             gameObject.SetActive(true);
-
-            StopCurrentCoroutine();
 
             _currentCoroutine = StartCoroutine(ShowCoroutine());
         }
@@ -87,6 +91,7 @@ namespace YARG.Gameplay.HUD
             // Fade in the box
             yield return _breBoxCanvasGroup
                 .DOFade(1f, 0.25f)
+                .SetLink(gameObject)
                 .WaitForCompletion();
         }
 
@@ -113,6 +118,8 @@ namespace YARG.Gameplay.HUD
         public void ForceReset()
         {
             StopCurrentCoroutine();
+
+            _breBoxCanvasGroup.transform.DOKill();
 
             _breBox.gameObject.SetActive(false);
 
@@ -166,7 +173,7 @@ namespace YARG.Gameplay.HUD
             }
 
             // Fade out the box
-            yield return _breBoxCanvasGroup.DOFade(0f, 0.25f).WaitForCompletion();
+            yield return _breBoxCanvasGroup.DOFade(0f, 0.25f).SetLink(gameObject).WaitForCompletion();
 
             _breBox.gameObject.SetActive(false);
             _currentCoroutine = null;
@@ -186,6 +193,13 @@ namespace YARG.Gameplay.HUD
                 StopCoroutine(_currentCoroutine);
                 _currentCoroutine = null;
             }
+
+            _breBoxCanvasGroup.DOKill();
+        }
+
+        private void OnDisable()
+        {
+            StopCurrentCoroutine();
         }
 
         public void PreviewForEditMode(bool on)

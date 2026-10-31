@@ -1,10 +1,12 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using PlasticBand.Haptics;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using YARG.Core;
 using YARG.Core.Audio;
 using YARG.Core.Chart;
 using YARG.Core.Engine;
+using YARG.Core.Game;
 using YARG.Core.Input;
 using YARG.Core.Logging;
 using YARG.Core.Replays;
@@ -12,7 +14,7 @@ using YARG.Gameplay.HUD;
 using YARG.Helpers.Extensions;
 using YARG.Helpers.UI;
 using YARG.Input;
-using YARG.Playback;
+using YARG.Multiplayer;
 using YARG.Player;
 using YARG.Settings;
 
@@ -98,6 +100,8 @@ namespace YARG.Gameplay.Player
         private Dictionary<int, GameInput> LastInputs { get; } = new();
         private Dictionary<int, GameInput> InputsToSendOnResume { get; } = new();
 
+        protected SongChart Chart { get; private set; }
+
         protected SyncTrack SyncTrack { get; private set; }
 
         protected bool IsInitialized { get; private set; }
@@ -113,9 +117,22 @@ namespace YARG.Gameplay.Player
 
         private int _replayInputIndex;
 
+        /// <summary>
+        /// How far behind the local song time a remote player's engine currently is.
+        /// Its track is drawn this much in the past so notes and hits line up.
+        /// </summary>
+        public double RemoteLagSeconds { get; private set; }
+
+        private double _remoteEngineTime = double.NegativeInfinity;
+
         private float _noteSpeedDifficultyScale;
 
-        protected EngineManager.EngineContainer EngineContainer;
+        public EngineManager.EngineContainer EngineContainer;
+
+        protected bool PlayerHasFailed;
+
+        public bool IsActive => Player.IsActive;
+        public bool IsBot    => Player.Profile.IsBot;
 
         protected override void GameplayAwake()
         {
@@ -133,8 +150,24 @@ namespace YARG.Gameplay.Player
             //Ensure hud elements get repositioned on screen size change
             if (ScreenSizeDetector.HasScreenSizeChanged)
             {
-                UpdateVisuals(GameManager.VisualTime);
+                UpdateVisuals(GetPlayerVisualTime(GameManager.VisualTime));
             }
+        }
+
+        /// <summary>
+        /// The visual time this player's track is drawn at. Track elements must use this instead of
+        /// <see cref="GameManager.VisualTime"/>, so a remote track's notes line up with its lagging engine.
+        /// </summary>
+        public double PlayerVisualTime => GetPlayerVisualTime(GameManager.VisualTime);
+
+        private double GetPlayerVisualTime(double visualTime)
+        {
+            // The vocal track is shared by every singer, so remote singers stay on local time
+            if (Player.IsRemote && Player.Profile.GameMode != GameMode.Vocals)
+            {
+                return visualTime - RemoteLagSeconds;
+            }
+            return visualTime;
         }
 
         protected void Start()
@@ -160,6 +193,12 @@ namespace YARG.Gameplay.Player
             HighwayIndex = index;
             Player = player;
 
+            if (!Player.IsReplay)
+            {
+                Player.MenuInput += OnMenuInput;
+            }
+
+            Chart = chart;
             SyncTrack = chart.SyncTrack;
 
             LastHighScore = lastHighScore;
@@ -193,13 +232,18 @@ namespace YARG.Gameplay.Player
                 UpdateInputs(GameManager.InputTime);
             }
 
-            UpdateVisuals(GameManager.VisualTime);
+            UpdateVisuals(GetPlayerVisualTime(GameManager.VisualTime));
         }
 
         protected abstract void UpdateVisuals(double visualTime);
         protected abstract void ResetVisuals();
         public abstract void Rewind(double visualTime);
         public abstract void PostRewind(double visualTime);
+
+        protected virtual void ResetDifficulty(double time)
+        {
+            _noteSpeedDifficultyScale = Player.Profile.CurrentDifficulty.NoteSpeedScale();
+        }
 
         public virtual void ResetPracticeSection()
         {
@@ -236,6 +280,7 @@ namespace YARG.Gameplay.Player
         {
             if (!Player.IsReplay)
             {
+                Player.MenuInput -= OnMenuInput;
                 UnsubscribeFromInputEvents();
             }
 
@@ -248,6 +293,17 @@ namespace YARG.Gameplay.Player
 
         protected virtual void UpdateInputs(double time)
         {
+            if (!IsActive)
+            {
+                return;
+            }
+
+            if (Player.IsRemote)
+            {
+                UpdateRemoteInputs(time);
+                return;
+            }
+
             // Apply input offset
             // Video offset is already accounted for
             time += InputCalibration;
@@ -272,6 +328,39 @@ namespace YARG.Gameplay.Player
             }
 
             BaseEngine.Update(time);
+
+            if (MultiplayerGameplay.IsInMatch && !Player.IsReplay)
+            {
+                MultiplayerGameplay.OnLocalEngineTime(this, time);
+            }
+        }
+
+        private void UpdateRemoteInputs(double time)
+        {
+            // Remote input times already include the sender's calibration, so none is applied here.
+            // The engine only runs up to what the sender has confirmed, so late packets freeze
+            // the track instead of turning into misses.
+            var inputs = Player.RemoteInputs;
+            double target = inputs.GetTargetTime(time);
+            if (double.IsNegativeInfinity(target))
+            {
+                RemoteLagSeconds = inputs.DelaySeconds;
+                return;
+            }
+
+            while (inputs.TryDequeue(target, out var input))
+            {
+                BaseEngine.QueueInput(ref input);
+                OnInputQueued(input);
+                _replayInputs.Add(input);
+            }
+
+            if (target > _remoteEngineTime)
+            {
+                _remoteEngineTime = target;
+                BaseEngine.Update(target);
+            }
+            RemoteLagSeconds = time - _remoteEngineTime;
         }
 
         private void SubscribeToInputEvents()
@@ -305,7 +394,7 @@ namespace YARG.Gameplay.Player
                 SantrollerHaptics.Remove(haptics);
             }
 
-            if (!GameManager.Paused && SettingsManager.Settings.PauseOnDeviceDisconnect.Value)
+            if (GameManager != null && !GameManager.Paused && SettingsManager.Settings.PauseOnDeviceDisconnect.Value)
             {
                 GameManager.SetPaused(true);
             }
@@ -322,11 +411,25 @@ namespace YARG.Gameplay.Player
             InputsToSendOnResume.Clear();
         }
 
+        protected virtual bool IsMenuOpen => false;
+
+        protected virtual void OnMenuInput(YargPlayer player, ref GameInput input)
+        {
+        }
+
         protected void OnGameInput(ref GameInput input)
         {
             // Ignore completely if the song hasn't started yet or player failed
-            if (!GameManager.Started || GameManager.PlayerHasFailed)
+            if (!GameManager.Started || PlayerHasFailed || !IsActive)
+            {
+                YargLogger.LogFormatDebug("Ignoring input: Started: {0} Failed: {1} IsActive: {2}", GameManager.Started, PlayerHasFailed, IsActive);
                 return;
+            }
+
+            if (IsMenuOpen && !SettingsManager.Settings.PauseOnMenuOpen.Value)
+            {
+                return;
+            }
 
             // Ignore while paused
             if (GameManager.Paused || GameManager.Rewinding)
@@ -353,7 +456,7 @@ namespace YARG.Gameplay.Player
 
             LastInputs[input.Action] = input;
 
-            double adjustedTime = GameManager.GetRelativeInputTime(input.Time);
+            double adjustedTime = GameManager.GetInputTime(input.Time);
             // Apply input offset
             adjustedTime += InputCalibration;
             input = new(adjustedTime, input.Action, input.Integer);
@@ -364,6 +467,11 @@ namespace YARG.Gameplay.Player
             BaseEngine.QueueInput(ref input);
             OnInputQueued(input);
             _replayInputs.Add(input);
+
+            if (MultiplayerGameplay.IsInMatch)
+            {
+                MultiplayerGameplay.OnLocalInput(this, input);
+            }
         }
 
         protected virtual void OnStarPowerPhraseHit()
@@ -390,7 +498,8 @@ namespace YARG.Gameplay.Player
         protected virtual void OnStarPowerStatus(bool active)
         {
             var deploySample = SfxSample.StarPowerDeploy;
-            if (SettingsManager.Settings.UseCrowdFx.Value == CrowdFxMode.Enabled)
+            if (SettingsManager.Settings.UseCrowdCheering.Value &&
+                !GlobalVariables.State.CrowdSfxVenueOverride)
             {
                 deploySample = SfxSample.StarPowerDeployCrowd;
             }

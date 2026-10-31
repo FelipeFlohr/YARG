@@ -5,6 +5,7 @@ using YARG.Menu.MusicLibrary;
 using YARG.Menu.Navigation;
 using YARG.Menu.Persistent;
 using YARG.Menu.Settings;
+using YARG.Multiplayer;
 using YARG.Settings;
 
 namespace YARG.Menu.Main
@@ -44,7 +45,7 @@ namespace YARG.Menu.Main
         private void OnEnable()
         {
             // Set navigation scheme
-            Navigator.Instance.PushScheme(new NavigationScheme(new()
+            _ = Navigator.Instance.PushScheme(new NavigationScheme(new()
             {
                 NavigationScheme.Entry.NavigateSelect,
                 NavigationScheme.Entry.NavigateUp,
@@ -73,13 +74,9 @@ namespace YARG.Menu.Main
             menu.gameObject.SetActive(true);
         }
 
-        public void Practice()
+        public void GameModes()
         {
-            var menu = MenuManager.Instance.PushMenu(MenuManager.Menu.MusicLibrary, false);
-
-            MusicLibraryMenu.LibraryMode = MusicLibraryMode.Practice;
-
-            menu.gameObject.SetActive(true);
+            MenuManager.Instance.PushMenu(MenuManager.Menu.GameModes);
         }
 
         public void Profiles()
@@ -87,9 +84,14 @@ namespace YARG.Menu.Main
             MenuManager.Instance.PushMenu(MenuManager.Menu.ProfileList);
         }
 
-        public void Replays()
+        public void Content()
         {
-            MenuManager.Instance.PushMenu(MenuManager.Menu.History);
+            MenuManager.Instance.PushMenu(MenuManager.Menu.Content);
+        }
+
+        public void Multiplayer()
+        {
+            MultiplayerMenuFlow.OpenEntry();
         }
 
         public void Credits()

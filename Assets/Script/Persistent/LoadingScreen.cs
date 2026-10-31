@@ -1,10 +1,12 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
+using UnityEngine.UI;
 using YARG.Core.Logging;
 using YARG.Helpers;
+using YARG.Input.Bindings;
 using YARG.Integration;
 using YARG.Localization;
 using YARG.Menu.Navigation;
@@ -21,6 +23,16 @@ namespace YARG
         public TextMeshProUGUI SubPhrase;
 
         public static bool IsActive => Instance.gameObject.activeSelf;
+
+        protected override void SingletonAwake()
+        {
+            // This object owns an override-sorting canvas, so the raycaster on the
+            // parent canvas cannot use its full-screen image as an input blocker.
+            if (GetComponent<GraphicRaycaster>() == null)
+            {
+                gameObject.AddComponent<GraphicRaycaster>();
+            }
+        }
 
         private async void Start()
         {
@@ -55,30 +67,14 @@ namespace YARG
                 YargLogger.LogException(e);
             }
 
-            // Load song sources and icons
-            try
-            {
-                await SongSources.LoadSources(context);
-            }
-            catch (Exception ex)
-            {
-                YargLogger.LogException(ex);
-            }
-
-            // Load (sub)genre mappings
-            try
-            {
-                await Genrelizer.LoadGenreMappings(context);
-            }
-            catch (Exception ex)
-            {
-                YargLogger.LogException(ex);
-            }
+            // Load sources and genre mappings concurrently
+            await UpdateSourcesAndGenres(context);
 
             // Auto connect profiles, using the same order that they were previously connected.
             if (SettingsManager.Settings.ReconnectProfiles.Value)
             {
                 PlayerContainer.AutoConnectProfiles();
+                RetryUnresolvedMicrophones().Forget();
             }
             else
             {
@@ -105,6 +101,55 @@ namespace YARG
             await SongContainer.RunRefresh(true, context);
         }
 
+        private static async UniTask UpdateSourcesAndGenres(LoadingContext context)
+        {
+            var tasks = new List<string> { "Song Sources", "Genres" };
+            context.SetLoadingText("Updating Song Sources and Genres...");
+
+            RefreshText();
+
+            try
+            {
+                await UniTask.WhenAll(
+                    TaskWrapper(SongSources.LoadSources(), "Song Sources"),
+                    TaskWrapper(Genrelizer.LoadGenreMappings(), "Genres")
+                    );
+            }
+            catch (Exception ex)
+            {
+                YargLogger.LogException(ex);
+            }
+
+            return;
+
+            async UniTask TaskWrapper(UniTask task, string name)
+            {
+                try
+                {
+                    await task;
+                }
+                finally
+                {
+                    tasks.Remove(name);
+                    RefreshText();
+                }
+            }
+
+            void RefreshText()
+            {
+                if (tasks.Count > 0)
+                {
+                    context.SetSubText(string.Join(", ", tasks));
+                }
+            }
+        }
+
+        private static async UniTaskVoid RetryUnresolvedMicrophones()
+        {
+            await UniTask.Delay(2000);
+            BindingsContainer.ResolveMicrophones();
+        }
+
         private void Quit()
         {
 #if UNITY_EDITOR
@@ -117,7 +162,10 @@ namespace YARG
 
     public sealed class LoadingContext : IDisposable
     {
+        private static int _activeContextCount;
+
         private bool _disposed;
+        private readonly IDisposable _inputBlocker;
 
         private struct QueuedTask
         {
@@ -130,8 +178,10 @@ namespace YARG
 
         public LoadingContext()
         {
+            _inputBlocker = Navigator.Instance.PushInputBlocker();
+
+            _activeContextCount++;
             LoadingScreen.Instance.gameObject.SetActive(true);
-            Navigator.Instance.DisableMenuInputs = true;
         }
 
         public void SetLoadingText(string phrase, string sub = null)
@@ -179,14 +229,26 @@ namespace YARG
 
         public async void Dispose()
         {
-            if (!_disposed)
+            if (_disposed) return;
+
+            _disposed = true;
+
+            try
             {
                 await Wait();
-                LoadingScreen.Instance.gameObject.SetActive(false);
-                Navigator.Instance.DisableMenuInputs = false;
-                _disposed = true;
             }
-            GC.SuppressFinalize(this);
+            finally
+            {
+                _inputBlocker.Dispose();
+
+                _activeContextCount = Math.Max(0, _activeContextCount - 1);
+                if (_activeContextCount == 0)
+                {
+                    LoadingScreen.Instance.gameObject.SetActive(false);
+                }
+
+                GC.SuppressFinalize(this);
+            }
         }
 
         ~LoadingContext()
