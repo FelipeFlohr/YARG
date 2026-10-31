@@ -214,6 +214,7 @@ namespace YARG.Multiplayer
                 return;
             }
 
+            MultiplayerGameplay.EndMatch();
             Session.Dispose();
             Session = null;
 
@@ -261,6 +262,8 @@ namespace YARG.Multiplayer
                 Leave();
                 return;
             }
+
+            MultiplayerGameplay.BeginMatch(session);
 
             GlobalVariables.State = PersistentState.Default;
             GlobalVariables.State.CurrentSong = song;

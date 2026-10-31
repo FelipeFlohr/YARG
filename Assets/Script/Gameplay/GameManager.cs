@@ -22,6 +22,7 @@ using YARG.Localization;
 using YARG.Menu.Navigation;
 using YARG.Menu.Persistent;
 using YARG.Menu.ScoreScreen;
+using YARG.Multiplayer;
 using YARG.Playback;
 using YARG.Player;
 using YARG.Replays;
@@ -162,6 +163,15 @@ namespace YARG.Gameplay
 
         private bool _isReplaySaved;
         private int _originalSleepTimeout;
+
+        private const double MULTIPLAYER_LEAVE_WINDOW    = 1;
+        private const double MULTIPLAYER_FINISH_TIMEOUT  = 3;
+
+        private double _lastMultiplayerPausePress = double.NegativeInfinity;
+        private bool   _multiplayerEnding;
+
+        // Final stats the remote players sent, by multiplayer player id
+        private IReadOnlyDictionary<int, ReplayFrame> _remoteFinalFrames;
         private bool _breBoxActive;
 
         private StemMixer _mixer;
@@ -269,7 +279,7 @@ namespace YARG.Gameplay
                     !DialogManager.Instance.IsDialogShowing &&
                     !PlayerHasFailed)
                 {
-                    SetPaused(!_pauseMenu.IsOpen);
+                    OnPausePressed(!_pauseMenu.IsOpen);
                 }
             }
 
@@ -370,8 +380,35 @@ namespace YARG.Gameplay
 
         public void Pause(bool showMenu = true)
         {
+            // Online songs never pause, not even on focus loss or a disconnected device
+            if (MultiplayerManager.IsActive)
+            {
+                return;
+            }
+
             _songRunner.Pause();
             PauseCore(showMenu);
+        }
+
+        private void OnPausePressed(bool pause)
+        {
+            if (!MultiplayerManager.IsActive)
+            {
+                SetPaused(pause);
+                return;
+            }
+
+            // Pressing pause twice in a row leaves the match
+            double now = Time.unscaledTimeAsDouble;
+            if (now - _lastMultiplayerPausePress <= MULTIPLAYER_LEAVE_WINDOW)
+            {
+                MultiplayerManager.Instance.Leave();
+                ForceQuitSong();
+                return;
+            }
+
+            _lastMultiplayerPausePress = now;
+            ToastManager.ToastInformation(Localize.Key("Menu.Multiplayer.PressAgainToLeave"));
         }
 
         private void PauseCore(bool showMenu)
@@ -600,6 +637,53 @@ namespace YARG.Gameplay
                 Pause(false);
                 return true;
             }
+
+            if (MultiplayerManager.IsActive)
+            {
+                // Keeps updating the players while waiting, so remote tracks catch up
+                if (!_multiplayerEnding)
+                {
+                    _multiplayerEnding = true;
+                    EndMultiplayerSong().Forget();
+                }
+                return true;
+            }
+
+            ShowResults();
+            return true;
+        }
+
+        private async UniTaskVoid EndMultiplayerSong()
+        {
+            var localPlayer = _players.FirstOrDefault(player => !player.Player.IsRemote);
+            if (localPlayer != null)
+            {
+                MultiplayerGameplay.SendFinished(localPlayer);
+            }
+
+            _remoteFinalFrames = await MultiplayerGameplay.AwaitFinishedFrames(MULTIPLAYER_FINISH_TIMEOUT);
+
+            // The scene changed, or the session ended and went back to the menu
+            if (this == null || !MultiplayerManager.IsActive)
+            {
+                return;
+            }
+
+            ShowResults();
+        }
+
+        private BaseStats GetResultStats(BasePlayer player)
+        {
+            if (player.Player.IsRemote && _remoteFinalFrames != null &&
+                _remoteFinalFrames.TryGetValue(player.Player.RemotePlayerId, out var frame))
+            {
+                return frame.Stats;
+            }
+            return player.BaseStats;
+        }
+
+        private void ShowResults()
+        {
 #nullable enable
             ReplayInfo? replayInfo = null;
 #nullable disable
@@ -620,11 +704,11 @@ namespace YARG.Gameplay
                 {
                     IsHighScore = player.Score > player.LastHighScore,
                     Player = player.Player,
-                    Stats = player.BaseStats,
+                    Stats = GetResultStats(player),
                     AverageMultiplier = player.BaseEngine.BaseNoteScore == 0 ?
                         0 :
                         // PendingScore should be 0 at this point, so no reason to add it
-                        (float) player.BaseStats.CommittedScore / player.BaseEngine.BaseNoteScore,
+                        (float) GetResultStats(player).CommittedScore / player.BaseEngine.BaseNoteScore,
                 }).ToArray(),
                 BandScore = BandScore,
                 BandStars = (int) BandStars,
@@ -635,7 +719,6 @@ namespace YARG.Gameplay
 
             // Go to the score screen
             GlobalVariables.Instance.LoadScene(SceneIndex.Score);
-            return true;
         }
 
         private void RecordScores(ReplayInfo replayInfo)
@@ -652,8 +735,8 @@ namespace YARG.Gameplay
             {
                 var profile = player.Player.Profile;
 
-                // Skip bots and anyone that's obviously cheating.
-                if (!ScoreContainer.IsSoloScoreValid(SongSpeed, player.Player))
+                // Skip bots, online players from other computers and anyone that's obviously cheating.
+                if (player.Player.IsRemote || !ScoreContainer.IsSoloScoreValid(SongSpeed, player.Player))
                 {
                     continue;
                 }
@@ -681,7 +764,7 @@ namespace YARG.Gameplay
                 starScoreCutoffsList.Add(player.BaseEngine.StarScoreThresholds);
             }
 
-            var validScoreCount = _players.Count(p => ScoreContainer.IsSoloScoreValid(SongSpeed, p.Player));
+            var validScoreCount = _players.Count(p => !p.Player.IsRemote && ScoreContainer.IsSoloScoreValid(SongSpeed, p.Player));
             if (validScoreCount == 0)
             {
                 return;
@@ -857,7 +940,7 @@ namespace YARG.Gameplay
 
                     if ((!IsPractice || PracticeManager.HasSelectedSection) && !DialogManager.Instance.IsDialogShowing && !PlayerHasFailed)
                     {
-                        SetPaused(!_songRunner.Paused);
+                        OnPausePressed(!_songRunner.Paused);
                     }
                     break;
             }

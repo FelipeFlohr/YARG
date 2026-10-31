@@ -5,6 +5,7 @@ using UnityEngine.InputSystem;
 using YARG.Core.Audio;
 using YARG.Core.Chart;
 using YARG.Core.Engine;
+using YARG.Core.Game;
 using YARG.Core.Input;
 using YARG.Core.Logging;
 using YARG.Core.Replays;
@@ -12,6 +13,7 @@ using YARG.Gameplay.HUD;
 using YARG.Helpers.Extensions;
 using YARG.Helpers.UI;
 using YARG.Input;
+using YARG.Multiplayer;
 using YARG.Playback;
 using YARG.Player;
 using YARG.Settings;
@@ -113,6 +115,14 @@ namespace YARG.Gameplay.Player
 
         private int _replayInputIndex;
 
+        /// <summary>
+        /// How far behind the local song time a remote player's engine currently is.
+        /// Its track is drawn this much in the past so notes and hits line up.
+        /// </summary>
+        public double RemoteLagSeconds { get; private set; }
+
+        private double _remoteEngineTime = double.NegativeInfinity;
+
         private float _noteSpeedDifficultyScale;
 
         protected EngineManager.EngineContainer EngineContainer;
@@ -133,8 +143,18 @@ namespace YARG.Gameplay.Player
             //Ensure hud elements get repositioned on screen size change
             if (ScreenSizeDetector.HasScreenSizeChanged)
             {
-                UpdateVisuals(GameManager.VisualTime);
+                UpdateVisuals(GetPlayerVisualTime(GameManager.VisualTime));
             }
+        }
+
+        private double GetPlayerVisualTime(double visualTime)
+        {
+            // The vocal track is shared by every singer, so remote singers stay on local time
+            if (Player.IsRemote && Player.Profile.GameMode != GameMode.Vocals)
+            {
+                return visualTime - RemoteLagSeconds;
+            }
+            return visualTime;
         }
 
         protected void Start()
@@ -193,7 +213,7 @@ namespace YARG.Gameplay.Player
                 UpdateInputs(GameManager.InputTime);
             }
 
-            UpdateVisuals(GameManager.VisualTime);
+            UpdateVisuals(GetPlayerVisualTime(GameManager.VisualTime));
         }
 
         protected abstract void UpdateVisuals(double visualTime);
@@ -248,6 +268,12 @@ namespace YARG.Gameplay.Player
 
         protected virtual void UpdateInputs(double time)
         {
+            if (Player.IsRemote)
+            {
+                UpdateRemoteInputs(time);
+                return;
+            }
+
             // Apply input offset
             // Video offset is already accounted for
             time += InputCalibration;
@@ -272,6 +298,39 @@ namespace YARG.Gameplay.Player
             }
 
             BaseEngine.Update(time);
+
+            if (MultiplayerManager.IsActive && !Player.IsReplay)
+            {
+                MultiplayerGameplay.OnLocalEngineTime(this, time);
+            }
+        }
+
+        private void UpdateRemoteInputs(double time)
+        {
+            // Remote input times already include the sender's calibration, so none is applied here.
+            // The engine only runs up to what the sender has confirmed, so late packets freeze
+            // the track instead of turning into misses.
+            var inputs = Player.RemoteInputs;
+            double target = inputs.GetTargetTime(time);
+            if (double.IsNegativeInfinity(target))
+            {
+                RemoteLagSeconds = inputs.DelaySeconds;
+                return;
+            }
+
+            while (inputs.TryDequeue(target, out var input))
+            {
+                BaseEngine.QueueInput(ref input);
+                OnInputQueued(input);
+                _replayInputs.Add(input);
+            }
+
+            if (target > _remoteEngineTime)
+            {
+                _remoteEngineTime = target;
+                BaseEngine.Update(target);
+            }
+            RemoteLagSeconds = time - _remoteEngineTime;
         }
 
         private void SubscribeToInputEvents()
@@ -364,6 +423,11 @@ namespace YARG.Gameplay.Player
             BaseEngine.QueueInput(ref input);
             OnInputQueued(input);
             _replayInputs.Add(input);
+
+            if (MultiplayerManager.IsActive)
+            {
+                MultiplayerGameplay.OnLocalInput(this, input);
+            }
         }
 
         protected virtual void OnStarPowerPhraseHit()

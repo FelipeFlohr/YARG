@@ -5,6 +5,7 @@ using YARG.Core.Game;
 using YARG.Core.Input;
 using YARG.Core.Replays;
 using YARG.Input;
+using YARG.Multiplayer.Sync;
 using YARG.Settings.Customization;
 using YARG.Themes;
 
@@ -40,6 +41,14 @@ namespace YARG.Player
 
         public bool IsReplay { get; private set; }
         public int ReplayIndex = -1;
+
+        /// <summary>
+        /// Whether this is another online multiplayer player, driven by inputs received from the network.
+        /// Remote players are also replays, so nothing reads local devices for them.
+        /// </summary>
+        public bool IsRemote { get; private set; }
+        public int RemotePlayerId { get; private set; } = -1;
+        public RemoteInputBuffer RemoteInputs { get; private set; }
 
         /// <summary>
         /// Overrides the engine parameters in the gameplay player.
@@ -78,6 +87,31 @@ namespace YARG.Player
             HighwayPreset = CustomContentManager.HighwayPresets.GetPresetById(Profile.HighwayPreset)
                 ?? HighwayPreset.Default;
 
+            RockMeterPreset = CustomContentManager.RockMeterPresets.GetPresetById(Profile.RockMeterPreset) ??
+                YARG.Core.Game.RockMeterPreset.Normal;
+        }
+
+        public YargPlayer(ReplayFrame setup, int remotePlayerId, RemoteInputBuffer inputs)
+        {
+            Profile = setup.Profile;
+            Bindings = null;
+            EngineParameterOverride = setup.EngineParameters;
+            IsReplay = true;
+            IsRemote = true;
+            RemotePlayerId = remotePlayerId;
+            RemoteInputs = inputs;
+
+            // Same resolution as replays, minus the presets a replay file carries
+            EnginePreset = CustomContentManager.EnginePresets.GetPresetById(Profile.EnginePreset)
+                ?? EnginePreset.Default;
+            ThemePreset = CustomContentManager.ThemePresets.GetPresetById(Profile.ThemePreset)
+                ?? ThemePreset.Default;
+            ColorProfile = CustomContentManager.ColorProfiles.GetPresetById(Profile.ColorProfile)
+                ?? ColorProfile.Default;
+            CameraPreset = CustomContentManager.CameraSettings.GetPresetById(Profile.CameraPreset)
+                ?? CameraPreset.Default;
+            HighwayPreset = CustomContentManager.HighwayPresets.GetPresetById(Profile.HighwayPreset)
+                ?? HighwayPreset.Default;
             RockMeterPreset = CustomContentManager.RockMeterPresets.GetPresetById(Profile.RockMeterPreset) ??
                 YARG.Core.Game.RockMeterPreset.Normal;
         }
