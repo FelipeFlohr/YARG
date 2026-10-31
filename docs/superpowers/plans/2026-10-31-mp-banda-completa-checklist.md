@@ -19,10 +19,10 @@ eventos se agrupam no mesmo `song=`.
 |---|---|---|---|---|
 | `same-instrument` | Soliloquy | PASS | 4 min | `python3 run_scenario.py same-instrument` |
 | `no-stems` | Making Memories | PASS | 4,5 min | `python3 run_scenario.py no-stems` |
-| `band4` | Soliloquy | PASS na build c1108023; **FAIL** nas 3 execuções da build final, só pela folga de desmute/mute remoto (ver abaixo) | 5,7 min | `python3 run_scenario.py band4` |
-| `keys` | Subdivisions | PASS (build final, 1ª tentativa) | 8,3 min | `python3 run_scenario.py keys` |
+| `band4` | Soliloquy | PASS na build c1108023; **FAIL** nas 3 execuções da build da rodada 2, só pela folga de desmute/mute remoto (ver abaixo) | 5,7 min | `python3 run_scenario.py band4` |
+| `keys` | Subdivisions | PASS (build da rodada 2, 1ª tentativa) | 8,3 min | `python3 run_scenario.py keys` |
 
-**Rodada de correção 2 (build final, `YARG.Core` com o conserto do bot de vocal).** `keys`: OK na 1ª tentativa. `band4`: 3
+**Rodada de correção 2 (build da rodada 2, `YARG.Core` com o conserto do bot de vocal).** `keys`: OK na 1ª tentativa. `band4`: 3
 tentativas, todas reprovadas só por tempo (as pontuações e o `Band:` ficaram iguais nas 4 máquinas, o vocal fez 14/14):
 - tentativa 1: desmute remoto em 47,12 a 49,39 (limite 45,0); tentativa 2: só o vocals, 48,51; tentativa 3: drums 45,42 e o
   vocals só mutou em 42,87 (limite de mute 42,0).
@@ -49,15 +49,15 @@ iguais às enviadas em `Finished`. Só `same-instrument` e `no-stems` foram refe
 - [x] `same-instrument`: host e `guit2` com as mesmas duas linhas `Result:` e `Band: score=208533 stars=5`.
 - [x] `no-stems`: `Band: score=584042 stars=5` nas duas.
 - [x] `band4`: `Band: score=505724 stars=5` nas quatro (host, bass, drums, vocals), com `Result:` de Guit, Bass, Drum
-  e Voc iguais nas quatro (última execução, build final).
-- [x] `keys`: `Band: score=1487405 stars=5` nas três (build final) (host, guitar, prokeys), com `Result:` de Keys, Guit e ProKeys
+  e Voc iguais nas quatro (última execução, build da rodada 2).
+- [x] `keys`: `Band: score=1487405 stars=5` nas três (build da rodada 2) (host, guitar, prokeys), com `Result:` de Keys, Guit e ProKeys
   iguais nas três.
 
 O verificador compara todas as linhas `Result:` (pontuação, acertos/total) e `Band:` entre as máquinas.
 
 ## 2. Stems separados: o erro do guitarrista muta a guitarra nas outras máquinas e desmuta no próximo acerto
 
-- [x] `band4` (Soliloquy, host erra de 30 a 40 s). **Vale para a build antiga (c1108023)**; na build final o `band4` reprovou só pela folga de desmute do verificador, não por falha de mute. Primeiro `Stem Guitar fraction=0.00` e primeiro `1.00` depois:
+- [x] `band4` (Soliloquy, host erra de 30 a 40 s). **Vale para a build antiga (c1108023)**; na build da rodada 2 o `band4` reprovou só pela folga de desmute do verificador, não por falha de mute. Primeiro `Stem Guitar fraction=0.00` e primeiro `1.00` depois:
 
   | Máquina | Papel | mute (0.00) | desmute (1.00) |
   |---|---|---|---|
@@ -69,7 +69,7 @@ O verificador compara todas as linhas `Result:` (pontuação, acertos/total) e `
   A guitarra foi mutada nas 4 máquinas dentro da janela (30 a 42) e voltou a 1.00 até 45. Os remotos atrasam de
   0,4 s a 7 s sobre o host nesta execução; o atraso inclui o buffer de entrada dos remotos e o quadro lento. Depois
   da janela há mutes e desmutes de sustain (fim de sustain solto) que o verificador aceita.
-- [x] `keys` (Subdivisions, guitarrista erra de 60 a 70 s). Tempos da tabela: build c1108023. Na build final `keys` passou, com desmute em 70.08 (guitar), 72.19 (host) e 72.84 (prokeys):
+- [x] `keys` (Subdivisions, guitarrista erra de 60 a 70 s). Tempos da tabela: build c1108023. Na build da rodada 2 `keys` passou, com desmute em 70.08 (guitar), 72.19 (host) e 72.84 (prokeys):
 
   | Máquina | Papel | mute (0.00) | desmute (1.00) |
   |---|---|---|---|
@@ -137,7 +137,7 @@ jogador scripted (mutes de sustain que um jogador de verdade não teria).
 - Áudio audível (PCM nulo): só os eventos de volume do stem foram lidos.
 - Render na GPU real (llvmpipe), e qualquer coisa visual (pista remota, HUD, tela de resultados).
 - Fail meter ligado (`NoFail: 1` em todas as instâncias).
-- `band4` passando na build final (reprovado só pelos limites de tempo do verificador; ver acima).
+- `band4` passando na build da rodada 2 (reprovado só pelos limites de tempo do verificador; ver acima).
 - Os dois jogadores da mesma parte errando juntos (só coberto por testes do núcleo).
 - Dois humanos de verdade no mesmo instrumento; vocal com cantor de verdade (só o bot, que faz 14/14).
 
