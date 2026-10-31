@@ -45,6 +45,12 @@ namespace YARG
 
         public SceneIndex CurrentScene { get; private set; } = SceneIndex.Persistent;
 
+        /// <summary>
+        /// From <see cref="LoadScene"/> until the new scene finished loading. <see cref="CurrentScene"/> already
+        /// names the new scene meanwhile, and loading another one before that fails.
+        /// </summary>
+        public bool IsLoadingScene { get; private set; }
+
         public string CurrentVersion { get; private set; } = "v0.15";
 
         private float _nextLocalizationUpdate;
@@ -162,6 +168,7 @@ namespace YARG
             GameStateFetcher.SetSceneIndex(scene);
 
             await SceneManager.LoadSceneAsync((int) scene, LoadSceneMode.Additive);
+            IsLoadingScene = false;
 
             // When complete, set the newly loaded scene to the active one
             SceneManager.SetActiveScene(SceneManager.GetSceneByBuildIndex((int) scene));
@@ -174,6 +181,7 @@ namespace YARG
         public void LoadScene(SceneIndex scene)
         {
             Navigator.Instance.DisableMenuInputs = true;
+            IsLoadingScene = true;
 
             // Unload the current scene and load in the new one, or just load in the new one
             if (CurrentScene != SceneIndex.Persistent)

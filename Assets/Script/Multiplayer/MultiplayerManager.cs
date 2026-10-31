@@ -325,6 +325,19 @@ namespace YARG.Multiplayer
                 return;
             }
 
+            LoadMatch(session, song, offer).Forget();
+        }
+
+        private async UniTaskVoid LoadMatch(IMultiplayerSession session, SongEntry song, SongOffer offer)
+        {
+            // Somebody coming back from the score screen may still be loading the menu when the host
+            // starts the next song, and loading another scene before that finishes fails
+            await UniTask.WaitUntil(() => !GlobalVariables.Instance.IsLoadingScene);
+            if (Session != session)
+            {
+                return;
+            }
+
             MultiplayerMenuFlow.CloseAll();
             MultiplayerGameplay.BeginMatch(session);
 
