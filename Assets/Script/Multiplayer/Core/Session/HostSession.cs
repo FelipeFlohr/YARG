@@ -133,7 +133,9 @@ namespace YARG.Multiplayer.Session
 
             foreach (var peer in _peers.Values.ToList())
             {
-                if (now - peer.LastHeard > _config.TimeoutSeconds)
+                // A peer that has not said Hello yet is still handshaking
+                double limit = peer.Player == null ? _config.ConnectTimeoutSeconds : _config.TimeoutSeconds;
+                if (now - peer.LastHeard > limit)
                 {
                     _config.Log($"Peer {peer.PeerId} timed out");
                     RemovePeer(peer.PeerId, true);

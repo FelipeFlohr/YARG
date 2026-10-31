@@ -149,7 +149,7 @@ namespace YARG.Gameplay.Player
             Player.DropOut();
             GameManager.EngineManager.Unregister(EngineContainer);
 
-            SetStemMuteState(muted: false);
+            GameManager.RemoveStemParticipant(StemParticipantId);
             ClosePlayerMenu();
 
             GameManager.RefreshAllPlayerMenus();
@@ -341,6 +341,8 @@ namespace YARG.Gameplay.Player
         public override BaseEngine BaseEngine => Engine;
 
         protected List<TNote> Notes { get; set; }
+
+        public IReadOnlyList<TNote> ChartNotes => Notes;
 
         protected int NoteIndex { get; private set; }
 

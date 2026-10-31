@@ -186,13 +186,16 @@ namespace YARG.Gameplay
         private int _originalSleepTimeout;
 
         private const double MULTIPLAYER_LEAVE_WINDOW    = 1;
-        private const double MULTIPLAYER_FINISH_TIMEOUT  = 3;
+        private const double MULTIPLAYER_FINISH_TIMEOUT  = 15;
 
         private double _lastMultiplayerPausePress = double.NegativeInfinity;
         private bool   _multiplayerEnding;
 
         // Final stats the remote players sent, by multiplayer player id
         private IReadOnlyDictionary<int, ReplayFrame> _remoteFinalFrames;
+
+        // The stats sent in the Finished message, so the local result matches what the others add up
+        private BaseStats _localFinalStats;
 
         private StemMixer _mixer;
         public  StemMixer  Mixer => _mixer;
@@ -746,7 +749,7 @@ namespace YARG.Gameplay
             var localPlayer = _players.FirstOrDefault(player => !player.Player.IsRemote);
             if (localPlayer != null)
             {
-                MultiplayerGameplay.SendFinished(localPlayer);
+                _localFinalStats = MultiplayerGameplay.SendFinished(localPlayer);
             }
 
             _remoteFinalFrames = await MultiplayerGameplay.AwaitFinishedFrames(MULTIPLAYER_FINISH_TIMEOUT);
@@ -770,6 +773,10 @@ namespace YARG.Gameplay
             {
                 return frame.Stats;
             }
+            if (!player.Player.IsRemote && _localFinalStats != null)
+            {
+                return _localFinalStats;
+            }
             return player.BaseStats;
         }
 
@@ -788,6 +795,24 @@ namespace YARG.Gameplay
                 YargLogger.LogException(e, "Failed to save replay!");
             }
 
+            int bandScore = BandScore;
+            int bandStars = (int) BandStars;
+            if (MultiplayerGameplay.IsInMatch)
+            {
+                // Always from the final stats of each player, so every machine shows the same result
+                var (score, stars) = YARG.Multiplayer.Gameplay.BandResult.Compute(
+                    _players.Select(p =>
+                    {
+                        var s = GetResultStats(p);
+                        return (s.TotalScore, s.BandBonusScore);
+                    }),
+                    EngineManager.StarScoreThresholds);
+                YargLogger.LogFormatInfo("Band result: simulated {0}, authoritative {1}, players {2}",
+                    bandScore, score, _players.Count);
+                bandScore = score;
+                bandStars = stars;
+            }
+
             // Pass the score info to the stats screen
             GlobalVariables.State.ScoreScreenStats = new ScoreScreenStats
             {
@@ -798,8 +823,8 @@ namespace YARG.Gameplay
                     Stats = GetResultStats(player),
                     IsReplay = player.Player.IsReplay
                 }).ToArray(),
-                BandScore = BandScore,
-                BandStars = (int) BandStars,
+                BandScore = bandScore,
+                BandStars = bandStars,
 
                 MeanAverageOffset = ActivePlayers
                     .Where(player => !(player.IsBot || player.Player.IsRemote))

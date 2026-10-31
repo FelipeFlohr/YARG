@@ -21,6 +21,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="../../YARG.Core/YARG.Core.UnitTests/Engine/Test Charts/drawntotheflame.mid" Link="TestCharts/drawntotheflame.mid" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="../../YARG.Core/YARG.Core/YARG.Core.csproj" />
   </ItemGroup>
 

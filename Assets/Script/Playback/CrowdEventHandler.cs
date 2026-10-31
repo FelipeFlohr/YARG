@@ -219,7 +219,7 @@ namespace YARG.Playback
         {
             if (IsCrowdMuted != muted || force)
             {
-                _gameManager.ChangeStemMuteState(SongStem.Crowd, muted, 1.0f);
+                _gameManager.ChangeStemMuteState(GameManager.CROWD_PARTICIPANT_ID, SongStem.Crowd, muted, 1.0f);
                 IsCrowdMuted = muted;
             }
         }

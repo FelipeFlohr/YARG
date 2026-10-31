@@ -7,6 +7,7 @@ using YARG.Core.Song;
 using YARG.Localization;
 using YARG.Menu;
 using YARG.Menu.Dialogs;
+using YARG.Menu.DifficultySelect;
 using YARG.Menu.MusicLibrary;
 using YARG.Menu.Navigation;
 using YARG.Menu.Persistent;
@@ -121,9 +122,15 @@ namespace YARG.Multiplayer
             var dialog = DialogManager.Instance.ShowList(Localize.Key("Menu.Multiplayer.ChoosePart"));
             foreach (var instrument in profile.GameMode.PossibleInstrumentsForSong(song))
             {
+                // The game mode lists vocal parts the song may not have
+                if (!PartDifficulty.HasPlayablePart(song, instrument))
+                {
+                    continue;
+                }
+
                 foreach (var difficulty in EnumExtensions<Difficulty>.Values)
                 {
-                    if (!song[instrument][difficulty])
+                    if (!PartDifficulty.HasPlayableDifficulty(song, instrument, difficulty))
                     {
                         continue;
                     }
