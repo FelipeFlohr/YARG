@@ -268,8 +268,9 @@ namespace YARG.Gameplay
 
                 MultiplayerGameplay.SendSetup(_players[0]);
 
-                context.SetLoadingText("Waiting for other players...");
-                var remotePlayers = await MultiplayerGameplay.AwaitRemotePlayers(MULTIPLAYER_SETUP_TIMEOUT);
+                var remotePlayers = await MultiplayerGameplay.AwaitRemotePlayers(MULTIPLAYER_SETUP_TIMEOUT,
+                    names => context.SetLoadingText(Localize.KeyFormat("Menu.Multiplayer.WaitingForPlayers",
+                        Localize.List(names))));
                 AddPlayers(remotePlayers);
                 YargPlayers = YargPlayers.Concat(remotePlayers).ToArray();
             }

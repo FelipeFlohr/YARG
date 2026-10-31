@@ -110,11 +110,15 @@ namespace YARG.Multiplayer
         /// Waits until every other player taking part sent its setup, and creates their players.
         /// Whoever is not here by the timeout plays without being shown.
         /// </summary>
-        public static async UniTask<List<YargPlayer>> AwaitRemotePlayers(double timeoutSeconds)
+        /// <param name="onWaiting">Called with the names of the players still loading whenever they change
+        /// (after a second, and never with nobody left).</param>
+        public static async UniTask<List<YargPlayer>> AwaitRemotePlayers(double timeoutSeconds,
+            Action<IReadOnlyList<string>> onWaiting = null)
         {
             double deadline = Now + timeoutSeconds;
+            var watcher = new WaitingWatcher(onWaiting);
             await UniTask.WaitUntil(() => _session == null || Now >= deadline ||
-                GetRemoteParticipants().All(id => _setups.ContainsKey(id)));
+                watcher.Update(GetRemoteParticipants().Where(id => !_setups.ContainsKey(id))));
 
             var players = new List<YargPlayer>();
             if (_session == null)
@@ -191,7 +195,10 @@ namespace YARG.Multiplayer
         /// Waits for the other players' final stats. Anybody who left or didn't finish in time
         /// gets their last checkpoint; players with neither are missing from the result.
         /// </summary>
-        public static async UniTask<IReadOnlyDictionary<int, ReplayFrame>> AwaitFinishedFrames(double timeoutSeconds)
+        /// <param name="onWaiting">Called with the names of the players still playing whenever they change
+        /// (after a second, and never with nobody left).</param>
+        public static async UniTask<IReadOnlyDictionary<int, ReplayFrame>> AwaitFinishedFrames(double timeoutSeconds,
+            Action<IReadOnlyList<string>> onWaiting = null)
         {
             var session = _session;
             var frames = new Dictionary<int, ReplayFrame>();
@@ -201,8 +208,9 @@ namespace YARG.Multiplayer
             }
 
             double deadline = Now + timeoutSeconds;
+            var watcher = new WaitingWatcher(onWaiting);
             await UniTask.WaitUntil(() => _session != session || Now >= deadline ||
-                _buffers.Keys.All(id => _finished.ContainsKey(id) || HasLeft(id)));
+                watcher.Update(_buffers.Keys.Where(id => !_finished.ContainsKey(id) && !HasLeft(id))));
 
             foreach (int playerId in _buffers.Keys)
             {
@@ -269,6 +277,43 @@ namespace YARG.Multiplayer
         {
             return _session != null && _session.Players.All(player =>
                 player.PlayerId != playerId || player.Status == LobbyPlayerStatus.Left);
+        }
+
+        /// <summary>
+        /// Reports who is still being waited for when that changes, once the grace period is over
+        /// (so waits that end right away show nothing).
+        /// </summary>
+        private sealed class WaitingWatcher
+        {
+            private const double GRACE_SECONDS = 1;
+
+            private readonly Action<IReadOnlyList<string>> _onWaiting;
+            private readonly double _reportAfter = Now + GRACE_SECONDS;
+            private string _last;
+
+            public WaitingWatcher(Action<IReadOnlyList<string>> onWaiting)
+            {
+                _onWaiting = onWaiting;
+            }
+
+            /// <returns>Whether nobody is left to wait for.</returns>
+            public bool Update(IEnumerable<int> waitingIds)
+            {
+                var ids = waitingIds.ToList();
+                if (_onWaiting != null && ids.Count > 0 && Now >= _reportAfter)
+                {
+                    var names = ids
+                        .Select(id => _session.Players.FirstOrDefault(player => player.PlayerId == id)?.Name ?? $"#{id}")
+                        .ToList();
+                    string key = string.Join(", ", names);
+                    if (key != _last)
+                    {
+                        _last = key;
+                        _onWaiting(names);
+                    }
+                }
+                return ids.Count == 0;
+            }
         }
 
         private static byte[] EncodeFrame(BasePlayer player)

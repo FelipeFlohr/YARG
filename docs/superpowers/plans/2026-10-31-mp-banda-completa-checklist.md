@@ -155,3 +155,32 @@ jogador scripted (mutes de sustain que um jogador de verdade não teria).
   instâncias disputando 4 núcleos com render por software; numa máquina real o atraso é menor.
 - Pontuações mudam um pouco de uma execução para outra (por exemplo, o bot de teclado), mas são iguais entre as
   máquinas na mesma execução.
+
+## Rodada 5: Windows nativo (pendências, 2026-10-31)
+
+Build de Windows (`MultiplayerTestBuild` agora gera o player da plataforma do editor) rodando como processos comuns
+neste PC (12 threads, GPU de verdade), com `run_scenario.py --native`: janelas 640x360 minimizadas, som desligado e
+`BackgroundFpsCap` padrão (10 quadros/s nas janelas sem foco). Inclui o keepalive do transporte (protocolo 3).
+
+| Cenário | Resultado | Mute do stem nas máquinas (s) | Banda igual em todas |
+|---|---|---|---|
+| `band4` | OK | host 30,31–40,29; remotas 30,52–30,58 até 40,51–40,57 | sim |
+| `same-instrument` | OK | nenhum (só um guitarrista erra) | sim |
+| `keys` | OK | Guitar muta e volta na janela 60–70 | sim |
+| `no-stems` | OK | nenhum | sim |
+| `same-instrument-both-miss` (novo) | OK | só no trecho comum: 35,11–35,30 até 40,30–40,51 | sim (146957, 4 estrelas) |
+| `four-lane` (novo) | OK | 60,21–60,42 até 70,07–70,34 | sim |
+| `fail-meter` (novo, `NoFail` 0) | OK | 30,32–30,54 até 40,32–40,54; a banda não falhou | sim |
+| `band8` (novo, 8 máquinas) | OK | 60,21–60,50 até 70,06–70,34 | sim (8 jogadores) |
+
+**Item 1 (atraso do mute remoto):** com hardware de verdade o mute e o desmute chegam às máquinas remotas
+0,2–0,3 s depois do host, o buffer fixo de 200 ms do `RemoteInputBuffer`, mesmo com 7 das 8 janelas a 10 quadros/s.
+Os 2–7 s da rodada 4 eram do PC do servidor (render por software, menos de 1 quadro/s). Folgas do verificador mantidas.
+
+**Pro guitar:** a cena `Gameplay` não tem pista de pro guitar (`_proGuitarPrefab: {fileID: 0}`) e o seletor de modo
+do perfil não oferece esse modo, então nenhum jogador chega nele. O autoteste forçava o instrumento e o jogador saía da
+partida ("No local player to play online with"); agora `-mp-instrument ProGuitar_*/ProBass_*` falha logo ao ler os
+argumentos. O cenário planejado com pro guitar virou `four-lane`.
+
+Continuam sem teste ponta a ponta: 6 trastes e elite drums (nenhuma música da biblioteca de teste tem esses charts),
+humanos de verdade, duas máquinas em rede real e o áudio ouvido.

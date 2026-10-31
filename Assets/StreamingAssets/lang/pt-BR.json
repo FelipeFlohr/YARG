@@ -301,6 +301,8 @@
             "SittingOutSong": "Você não tem esta música, então fica de fora desta vez.",
             "SongMissing": "A música a tocar não está na sua biblioteca.",
             "PressAgainToLeave": "Aperte pause de novo para sair da partida.",
+            "WaitingForPlayers": "Esperando os outros jogadores: {0}",
+            "WaitingForPlayersToFinish": "Esperando os outros jogadores terminarem: {0}",
             "Status": {
                 "Idle": "Aguardando",
                 "MissingSong": "Sem a música",

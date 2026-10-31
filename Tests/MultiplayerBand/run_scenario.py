@@ -1,4 +1,8 @@
-"""Host-side runner: python3 run_scenario.py <scenario> [--dry-run] [--stagger s]"""
+"""Host-side runner: python3 run_scenario.py <scenario> [--native] [--dry-run] [--stagger s]
+
+Without --native the instances run in Docker (Linux build, Xvfb, software rendering). With --native they run as
+plain processes on this machine with its own GPU and sound card (Windows or Linux build).
+"""
 import argparse
 import json
 import os
@@ -8,13 +12,21 @@ import subprocess
 import sys
 
 import check_band_logs
+import launch_in_container
+import minimize
 from scenarios import SCENARIOS
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 HOME = os.path.expanduser("~")
 RUNS = os.path.join(HOME, "yarg-mp-banda-runs")
 BUILD = os.path.join(HOME, "yarg-build-mp-banda")
-SONGS = os.path.join(HOME, "repos", "musicas yarg")
+SONGS = os.environ.get("YARG_MP_SONGS", os.path.join(HOME, "repos", "musicas yarg"))
+NATIVE_GAME = os.path.join(BUILD, "YARG.exe" if os.name == "nt" else "YARG.x86_64")
+NATIVE_WINDOW_FLAGS = ["-screen-fullscreen", "0", "-screen-width", "640", "-screen-height", "360"]
+NATIVE_SETTINGS = {
+    "FullscreenMode": 3,  # FullScreenMode.Windowed
+    "PauseOnFocusLoss": False,
+}
 BASE_SETTINGS = {
     "DisablePerSongBackgrounds": True,
     "DisableGlobalBackgrounds": True,
@@ -37,17 +49,50 @@ def docker_command(name, run_dir, stagger):
     return cmd
 
 
-def prepare(name, run_dir):
+def prepare(name, run_dir, songs="/songs", extra_settings=None):
     if os.path.isdir(run_dir):
         shutil.rmtree(run_dir)
-    for inst in SCENARIOS[name]["instances"]:
+    scenario = SCENARIOS[name]
+    for inst in scenario["instances"]:
         data = os.path.join(run_dir, inst["name"])
         os.makedirs(data)
         settings = dict(BASE_SETTINGS)
+        settings.update(scenario.get("settings", {}))
+        settings.update(extra_settings or {})
         if inst["role"] == "host":
-            settings["SongFolders"] = ["/songs"]
+            settings["SongFolders"] = [songs]
         with open(os.path.join(data, "settings.json"), "w") as f:
             json.dump(settings, f, indent=2)
+
+
+def run_native(name, run_dir, args):
+    if not os.path.isfile(args.game):
+        print("no game build at %s (see README.md, Build)" % args.game)
+        return 2
+    if not os.path.isdir(args.songs):
+        print("no song folder at %s (--songs or YARG_MP_SONGS)" % args.songs)
+        return 2
+
+    scenario = SCENARIOS[name]
+    settings = dict(NATIVE_SETTINGS)
+    # Sound off unless asked for: several instances at once are just noise
+    if not args.audible:
+        settings["MasterMusicVolume"] = 0
+    prepare(name, run_dir, songs=os.path.abspath(args.songs), extra_settings=settings)
+
+    # Minimized windows by default, so the machine stays usable while a scenario runs
+    minimizer = None if args.show else minimize.Minimizer()
+    try:
+        return launch_in_container.run_instances(
+            scenario,
+            lambda inst: launch_in_container.command(scenario, inst, game=args.game, work=run_dir,
+                                                     window_flags=NATIVE_WINDOW_FLAGS),
+            args.stagger, host_wait=args.host_wait,
+            popen_kwargs=minimizer.popen_kwargs() if minimizer else None,
+            on_started=minimizer.add if minimizer else None)
+    finally:
+        if minimizer:
+            minimizer.stop()
 
 
 def main(argv=None):
@@ -55,21 +100,31 @@ def main(argv=None):
     parser.add_argument("scenario", choices=sorted(SCENARIOS))
     parser.add_argument("--stagger", type=float, default=5.0)
     parser.add_argument("--dry-run", action="store_true", help="only print the docker command")
+    parser.add_argument("--native", action="store_true", help="run the build directly on this machine, no Docker")
+    parser.add_argument("--game", default=NATIVE_GAME, help="native: the player executable")
+    parser.add_argument("--songs", default=SONGS, help="native: the host's song folder")
+    parser.add_argument("--host-wait", type=float, default=launch_in_container.HOST_WAIT,
+                        help="native: seconds between the host and the first client")
+    parser.add_argument("--audible", action="store_true", help="native: keep the game's sound on")
+    parser.add_argument("--show", action="store_true", help="native: don't minimize the game windows")
     args = parser.parse_args(argv)
 
     run_dir = os.path.join(RUNS, args.scenario)
-    cmd = docker_command(args.scenario, run_dir, args.stagger)
-    if args.dry_run:
-        print(" ".join(shlex.quote(c) for c in cmd))
-        return 0
+    if args.native:
+        code = run_native(args.scenario, run_dir, args)
+        print("instances exit code: %d" % code)
+    else:
+        cmd = docker_command(args.scenario, run_dir, args.stagger)
+        if args.dry_run:
+            print(" ".join(shlex.quote(c) for c in cmd))
+            return 0
 
-    subprocess.call(["docker", "rm", "-f", "yarg-test-" + args.scenario],
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    prepare(args.scenario, run_dir)
-    code = subprocess.call(cmd)
-    print("container exit code: %d" % code)
+        subprocess.call(["docker", "rm", "-f", "yarg-test-" + args.scenario],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        prepare(args.scenario, run_dir)
+        code = subprocess.call(cmd)
+        print("container exit code: %d" % code)
 
-    logs = {}
     for inst in SCENARIOS[args.scenario]["instances"]:
         src = os.path.join(run_dir, inst["name"], "player.log")
         dst = os.path.join(run_dir, inst["name"] + ".log")

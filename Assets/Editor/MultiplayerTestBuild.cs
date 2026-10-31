@@ -9,7 +9,8 @@ using UnityEngine;
 namespace Editor
 {
     /// <summary>
-    /// Builds a Linux player into its own folder for the multiplayer band tests (batchmode, see Tests/MultiplayerBand).
+    /// Builds a player into its own folder for the multiplayer band tests (batchmode, see Tests/MultiplayerBand):
+    /// Windows when the editor runs on Windows, Linux otherwise.
     /// Usage: <c>-executeMethod Editor.MultiplayerTestBuild.Build [-mpBuildOutput dir]</c>.
     /// </summary>
     public static class MultiplayerTestBuild
@@ -28,11 +29,12 @@ namespace Editor
             {
                 output = args[index + 1];
             }
-            output = Path.GetFullPath(output).TrimEnd('/');
+            output = Path.GetFullPath(output).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 
             // That folder belongs to the regular test build
             string forbidden = Path.Combine(home, "yarg-build");
-            if (output == forbidden || output.StartsWith(forbidden + "/", StringComparison.Ordinal))
+            if (string.Equals(output, forbidden, StringComparison.OrdinalIgnoreCase) ||
+                output.StartsWith(forbidden + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
             {
                 Debug.LogError($"[MultiplayerTestBuild] refusing to write to {output}");
                 EditorApplication.Exit(1);
@@ -53,11 +55,13 @@ namespace Editor
 
                 Directory.CreateDirectory(output);
 
+                bool windows = Application.platform == RuntimePlatform.WindowsEditor;
+
                 var options = new BuildPlayerOptions
                 {
                     scenes = EditorBuildSettings.scenes.Where(s => s.enabled).Select(s => s.path).ToArray(),
-                    target = BuildTarget.StandaloneLinux64,
-                    locationPathName = Path.Combine(output, "YARG.x86_64"),
+                    target = windows ? BuildTarget.StandaloneWindows64 : BuildTarget.StandaloneLinux64,
+                    locationPathName = Path.Combine(output, windows ? "YARG.exe" : "YARG.x86_64"),
                     extraScriptingDefines = new[] { YARG_TEST_BUILD },
                 };
 

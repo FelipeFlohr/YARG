@@ -12,9 +12,20 @@ namespace YARG.Multiplayer.Transport
     /// TCP transport. Each connection has a reader thread and a writer thread, so neither
     /// <see cref="Send"/> nor <see cref="Poll"/> ever blocks on the network.
     /// </summary>
+    /// <remarks>
+    /// The writer thread sends an empty frame (a heartbeat) whenever the connection has been idle for the heartbeat
+    /// interval, and the reader drops a connection that received nothing for the timeout. Both run off the main
+    /// thread, so a peer whose game is busy (loading a song) stays connected while one whose network went away
+    /// is dropped within the timeout.
+    /// </remarks>
     public sealed class TcpTransport : INetTransport
     {
         private const int HOST_PEER_ID = 0;
+
+        private static readonly byte[] HEARTBEAT = MessageFramer.Frame(Array.Empty<byte>());
+
+        private readonly int _heartbeatIntervalMs;
+        private readonly int _timeoutMs;
 
         private sealed class Connection
         {
@@ -61,6 +72,12 @@ namespace YARG.Multiplayer.Transport
         /// The port actually listened on (useful after <c>StartHost(0)</c>).
         /// </summary>
         public int LocalPort => _listener != null ? ((IPEndPoint) _listener.LocalEndpoint).Port : 0;
+
+        public TcpTransport(double heartbeatIntervalSeconds = 1, double timeoutSeconds = 5)
+        {
+            _heartbeatIntervalMs = (int) (heartbeatIntervalSeconds * 1000);
+            _timeoutMs = (int) (timeoutSeconds * 1000);
+        }
 
         public void StartHost(int port)
         {
@@ -233,7 +250,8 @@ namespace YARG.Multiplayer.Transport
             string reason;
             try
             {
-                var stream = connection.Client!.GetStream();
+                connection.Client!.ReceiveTimeout = _timeoutMs;
+                var stream = connection.Client.GetStream();
                 while (true)
                 {
                     int read = stream.Read(buffer, 0, buffer.Length);
@@ -246,13 +264,20 @@ namespace YARG.Multiplayer.Transport
                     framer.Append(buffer.AsSpan(0, read));
                     while (framer.TryRead(out var message))
                     {
-                        _events.Enqueue(NetEvent.Received(connection.PeerId, message));
+                        if (message.Length > 0)
+                        {
+                            _events.Enqueue(NetEvent.Received(connection.PeerId, message));
+                        }
                     }
                 }
             }
             catch (InvalidDataException)
             {
                 reason = "message too large";
+            }
+            catch (IOException e) when (e.InnerException is SocketException { SocketErrorCode: SocketError.TimedOut or SocketError.WouldBlock })
+            {
+                reason = $"timed out (nothing received for {_timeoutMs / 1000.0:0.#} s)";
             }
             catch (Exception e) when (e is IOException || e is SocketException || e is ObjectDisposedException ||
                 e is InvalidOperationException)
@@ -268,10 +293,21 @@ namespace YARG.Multiplayer.Transport
             try
             {
                 var stream = connection.Client!.GetStream();
-                foreach (var framed in connection.Outgoing.GetConsumingEnumerable())
+                while (true)
                 {
-                    stream.Write(framed, 0, framed.Length);
-                    Interlocked.Add(ref connection.PendingBytes, -framed.Length);
+                    if (connection.Outgoing.TryTake(out var framed, _heartbeatIntervalMs))
+                    {
+                        stream.Write(framed, 0, framed.Length);
+                        Interlocked.Add(ref connection.PendingBytes, -framed.Length);
+                    }
+                    else if (connection.Outgoing.IsCompleted)
+                    {
+                        break;
+                    }
+                    else
+                    {
+                        stream.Write(HEARTBEAT, 0, HEARTBEAT.Length);
+                    }
                 }
 
                 // Queue drained after a graceful close; closing also stops the reader
