@@ -357,6 +357,7 @@ namespace YARG.Multiplayer.Session
             peer.Player = player;
 
             _transport.Send(peer.PeerId, MessageCodec.Encode(new Welcome(player.PlayerId)));
+            _transport.StartKeepAlive(peer.PeerId);
             if (State == SessionState.Transferring && CurrentOffer != null)
             {
                 _transport.Send(peer.PeerId, MessageCodec.Encode(CurrentOffer));

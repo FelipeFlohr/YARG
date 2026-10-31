@@ -110,8 +110,8 @@ namespace YARG.Multiplayer
         /// Waits until every other player taking part sent its setup, and creates their players.
         /// Whoever is not here by the timeout plays without being shown.
         /// </summary>
-        /// <param name="onWaiting">Called with the names of the players still loading whenever they change
-        /// (after a second, and never with nobody left).</param>
+        /// <param name="onWaiting">Called with the names of the players still loading when they change and
+        /// every few seconds (after a second, and never with nobody left).</param>
         public static async UniTask<List<YargPlayer>> AwaitRemotePlayers(double timeoutSeconds,
             Action<IReadOnlyList<string>> onWaiting = null)
         {
@@ -195,8 +195,8 @@ namespace YARG.Multiplayer
         /// Waits for the other players' final stats. Anybody who left or didn't finish in time
         /// gets their last checkpoint; players with neither are missing from the result.
         /// </summary>
-        /// <param name="onWaiting">Called with the names of the players still playing whenever they change
-        /// (after a second, and never with nobody left).</param>
+        /// <param name="onWaiting">Called with the names of the players still playing when they change and
+        /// every few seconds (after a second, and never with nobody left).</param>
         public static async UniTask<IReadOnlyDictionary<int, ReplayFrame>> AwaitFinishedFrames(double timeoutSeconds,
             Action<IReadOnlyList<string>> onWaiting = null)
         {
@@ -280,16 +280,20 @@ namespace YARG.Multiplayer
         }
 
         /// <summary>
-        /// Reports who is still being waited for when that changes, once the grace period is over
-        /// (so waits that end right away show nothing).
+        /// Reports who is still being waited for once the grace period is over (so waits that end right away show
+        /// nothing): when that changes, and again every few seconds, so a toast that expired comes back.
         /// </summary>
         private sealed class WaitingWatcher
         {
-            private const double GRACE_SECONDS = 1;
+            private const double GRACE_SECONDS  = 1;
+            // How long a toast stays up
+            private const double REPEAT_SECONDS = 5;
 
             private readonly Action<IReadOnlyList<string>> _onWaiting;
-            private readonly double _reportAfter = Now + GRACE_SECONDS;
-            private string _last;
+            private readonly double    _reportAfter = Now + GRACE_SECONDS;
+            private readonly List<int> _ids         = new();
+            private readonly List<int> _reportedIds = new();
+            private double _lastReport = double.NegativeInfinity;
 
             public WaitingWatcher(Action<IReadOnlyList<string>> onWaiting)
             {
@@ -299,20 +303,23 @@ namespace YARG.Multiplayer
             /// <returns>Whether nobody is left to wait for.</returns>
             public bool Update(IEnumerable<int> waitingIds)
             {
-                var ids = waitingIds.ToList();
-                if (_onWaiting != null && ids.Count > 0 && Now >= _reportAfter)
+                _ids.Clear();
+                _ids.AddRange(waitingIds);
+                if (_onWaiting == null || _ids.Count == 0 || Now < _reportAfter)
                 {
-                    var names = ids
-                        .Select(id => _session.Players.FirstOrDefault(player => player.PlayerId == id)?.Name ?? $"#{id}")
-                        .ToList();
-                    string key = string.Join(", ", names);
-                    if (key != _last)
-                    {
-                        _last = key;
-                        _onWaiting(names);
-                    }
+                    return _ids.Count == 0;
                 }
-                return ids.Count == 0;
+
+                if (!_ids.SequenceEqual(_reportedIds) || Now - _lastReport >= REPEAT_SECONDS)
+                {
+                    _reportedIds.Clear();
+                    _reportedIds.AddRange(_ids);
+                    _lastReport = Now;
+                    _onWaiting(_ids
+                        .Select(id => _session.Players.FirstOrDefault(player => player.PlayerId == id)?.Name ?? $"#{id}")
+                        .ToList());
+                }
+                return false;
             }
         }
 

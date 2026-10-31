@@ -8,6 +8,15 @@ namespace YARG.Helpers.Extensions
 {
     public static class GameModeExtensions
     {
+        /// <summary>
+        /// Whether the gameplay scene can show a track for this game mode. Pro guitar has an engine and bindings but
+        /// no track yet, and the profile editor doesn't offer it; keep this in step with <c>GameManager.CreatePlayer</c>.
+        /// </summary>
+        public static bool HasGameplayTrack(this GameMode gameMode)
+        {
+            return gameMode is not GameMode.ProGuitar;
+        }
+
         public static string ToResourceName(this GameMode instrument)
         {
             return instrument switch

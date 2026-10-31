@@ -605,7 +605,12 @@ namespace YARG.Gameplay
                 };
 
                 // Skip if there's no prefab for the game mode
-                if (prefab == null) return;
+                if (prefab == null)
+                {
+                    YargLogger.LogFormatWarning<GameMode, string>("No track for game mode {0}, {1} sits out", player.Profile.GameMode,
+                        player.Profile.Name);
+                    return;
+                }
 
                 var playerObject = Instantiate(prefab,
                     new Vector3(_highwayIndex * TRACK_SPACING_X, 100f, 0f), prefab.transform.rotation);

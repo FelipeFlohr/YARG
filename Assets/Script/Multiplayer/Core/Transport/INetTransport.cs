@@ -39,6 +39,13 @@ namespace YARG.Multiplayer.Transport
         long PendingSendBytes(int peerId);
 
         /// <summary>
+        /// Starts the keepalive for a peer: heartbeats while idle and a disconnect after a silence limit, both off
+        /// the main thread. Call it once the handshake shows both sides speak this protocol version, since older
+        /// builds treat a heartbeat as a malformed message. Transports without the concept ignore it.
+        /// </summary>
+        void StartKeepAlive(int peerId);
+
+        /// <summary>
         /// Closes the connection to a peer after the messages already queued for it are sent.
         /// A disconnect event is still raised for it.
         /// </summary>

@@ -54,6 +54,10 @@ namespace YARG.Multiplayer.Transport
 
             public long PendingSendBytes(int peerId) => 0;
 
+            public void StartKeepAlive(int peerId)
+            {
+            }
+
             public void Disconnect(int peerId)
             {
                 if (_peers.Remove(peerId, out var peer))

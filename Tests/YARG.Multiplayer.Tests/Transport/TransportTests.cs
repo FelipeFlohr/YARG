@@ -6,6 +6,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 using NUnit.Framework;
+using YARG.Multiplayer.Session;
 using YARG.Multiplayer.Transport;
 
 namespace YARG.Multiplayer.Tests.Transport
@@ -192,7 +193,7 @@ namespace YARG.Multiplayer.Tests.Transport
         }
 
         [Test]
-        public void Tcp_SilentPeerTimesOut()
+        public void Tcp_SilentPeerTimesOutOnceKeepAliveStarted()
         {
             using var host = new TcpTransport(heartbeatIntervalSeconds: 0.1, timeoutSeconds: 0.5);
             var hostEvents = new RecordingListener();
@@ -202,6 +203,9 @@ namespace YARG.Multiplayer.Tests.Transport
             using var raw = new TcpClient();
             raw.Connect(IPAddress.Loopback, host.LocalPort);
             PollUntil(() => hostEvents.Events.Contains("connected 1"), (host, hostEvents));
+            host.StartKeepAlive(1);
+            // The read in progress started without a timeout; the next one has it
+            raw.GetStream().Write(new byte[] { 1, 0, 0, 0, 42 });
 
             var watch = Stopwatch.StartNew();
             PollUntil(() => hostEvents.Disconnects.Count == 1, (host, hostEvents));
@@ -210,10 +214,29 @@ namespace YARG.Multiplayer.Tests.Transport
         }
 
         [Test]
+        public void Tcp_NoHeartbeatsOrTimeoutBeforeKeepAliveStarts()
+        {
+            // Older builds take an empty frame for a malformed message, so nothing may go out before the handshake
+            using var host = new TcpTransport(heartbeatIntervalSeconds: 0.05, timeoutSeconds: 0.3);
+            var hostEvents = new RecordingListener();
+            host.StartHost(0);
+
+            using var raw = new TcpClient();
+            raw.Connect(IPAddress.Loopback, host.LocalPort);
+            PollUntil(() => hostEvents.Events.Contains("connected 1"), (host, hostEvents));
+
+            Thread.Sleep(1000);
+            host.Poll(hostEvents);
+            Assert.That(raw.Available, Is.EqualTo(0));
+            Assert.That(hostEvents.Disconnects, Is.Empty);
+        }
+
+        [Test]
         public void Tcp_HeartbeatsKeepConnectionAliveWhileNobodyPolls()
         {
-            using var host = new TcpTransport(heartbeatIntervalSeconds: 0.1, timeoutSeconds: 0.5);
-            using var client = new TcpTransport(heartbeatIntervalSeconds: 0.1, timeoutSeconds: 0.5);
+            // Generous limits so a loaded machine that schedules the writer threads late doesn't fail the test
+            using var host = new TcpTransport(heartbeatIntervalSeconds: 0.05, timeoutSeconds: 1.5);
+            using var client = new TcpTransport(heartbeatIntervalSeconds: 0.05, timeoutSeconds: 1.5);
             var hostEvents = new RecordingListener();
             var clientEvents = new RecordingListener();
 
@@ -221,9 +244,11 @@ namespace YARG.Multiplayer.Tests.Transport
             client.Connect("127.0.0.1", host.LocalPort);
             PollUntil(() => hostEvents.Events.Contains("connected 1") && clientEvents.Events.Contains("connected 0"),
                 (host, hostEvents), (client, clientEvents));
+            host.StartKeepAlive(1);
+            client.StartKeepAlive(0);
 
-            // Both main threads "frozen" (as while loading a song) for several timeouts
-            Thread.Sleep(1500);
+            // Both main threads "frozen" (as while loading a song) for over twice the timeout
+            Thread.Sleep(3500);
             host.Poll(hostEvents);
             client.Poll(clientEvents);
             Assert.That(hostEvents.Disconnects, Is.Empty);
@@ -235,6 +260,53 @@ namespace YARG.Multiplayer.Tests.Transport
             client.Send(0, new byte[] { 7 });
             PollUntil(() => hostEvents.Messages.Count == 1, (host, hostEvents), (client, clientEvents));
             Assert.That(hostEvents.Messages[0].Message, Is.EqualTo(new byte[] { 7 }));
+        }
+
+        private sealed class KeepAliveSpy : INetTransport
+        {
+            private readonly INetTransport _inner;
+            public readonly List<int> Started = new();
+
+            public KeepAliveSpy(INetTransport inner) => _inner = inner;
+
+            public void StartHost(int port) => _inner.StartHost(port);
+            public void Connect(string host, int port) => _inner.Connect(host, port);
+            public void Send(int peerId, byte[] message) => _inner.Send(peerId, message);
+            public long PendingSendBytes(int peerId) => _inner.PendingSendBytes(peerId);
+            public void StartKeepAlive(int peerId) => Started.Add(peerId);
+            public void Disconnect(int peerId) => _inner.Disconnect(peerId);
+            public void Poll(INetEventListener listener) => _inner.Poll(listener);
+            public void Dispose() => _inner.Dispose();
+        }
+
+        [Test]
+        public void Sessions_StartTheKeepAliveOnlyAfterAnAcceptedHandshake()
+        {
+            var network = new InMemoryNetwork();
+            var hostTransport = new KeepAliveSpy(network.CreateHost());
+            using var host = new HostSession(hostTransport, new SessionConfig("v1", "Host"), () => 0);
+            host.Start(ProtocolInfo.DefaultPort);
+
+            var goodTransport = new KeepAliveSpy(network.CreateClient());
+            using var good = new ClientSession(goodTransport, new SessionConfig("v1", "Ana"), () => 0);
+            good.Connect("ignored", ProtocolInfo.DefaultPort);
+            var oldTransport = new KeepAliveSpy(network.CreateClient());
+            using var old = new ClientSession(oldTransport, new SessionConfig("v0", "Bia"), () => 0);
+            old.Connect("ignored", ProtocolInfo.DefaultPort);
+
+            Assert.That(hostTransport.Started, Is.Empty);
+            for (int i = 0; i < 4; i++)
+            {
+                host.Tick();
+                good.Tick();
+                old.Tick();
+            }
+
+            // Only the client that got a Welcome, and only on the host's side for that peer
+            Assert.That(goodTransport.Started, Is.EqualTo(new[] { 0 }));
+            Assert.That(oldTransport.Started, Is.Empty);
+            Assert.That(old.RejectReason, Is.Not.Null);
+            Assert.That(hostTransport.Started, Has.Count.EqualTo(1));
         }
 
         [Test]
