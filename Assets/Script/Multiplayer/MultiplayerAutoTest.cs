@@ -1,12 +1,16 @@
 using System;
+using System.Globalization;
 using System.Linq;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using YARG.Core;
 using YARG.Core.Extensions;
 using YARG.Core.Logging;
+using YARG.Core.Audio;
+using YARG.Core.Game;
 using YARG.Core.Song;
 using YARG.Menu.ScoreScreen;
+using YARG.Multiplayer.AutoTest;
 using YARG.Multiplayer.Protocol;
 using YARG.Multiplayer.Session;
 using YARG.Player;
@@ -17,7 +21,11 @@ namespace YARG.Multiplayer
     /// <summary>
     /// Plays online matches without anybody at the keyboard, for testing two instances on one machine:
     /// <c>-mp-autotest host [-mp-song name] [-mp-rounds n]</c> or <c>-mp-autotest join address</c>.
-    /// The local profile is turned into a bot. Every step is logged with an "[AutoTest]" prefix and the
+    /// By default the local profile is turned into a bot; extra arguments choose the part and the player instead:
+    /// <c>-mp-profile name</c> (find or create the profile), <c>-mp-instrument Instrument</c>, <c>-mp-difficulty Difficulty</c>,
+    /// <c>-mp-bot 0|1</c> (saved in the profile) and <c>-mp-miss from-to</c> (a human five-fret guitarist driven by a script
+    /// that misses on purpose between those song seconds). Stem mute changes and the band result are logged too.
+    /// Every step is logged with an "[AutoTest]" prefix and the
     /// game quits when the run is over ("[AutoTest] PASS" or "[AutoTest] FAIL ...").
     /// </summary>
     public static class MultiplayerAutoTest
@@ -54,9 +62,80 @@ namespace YARG.Multiplayer
             YargLogger.LogFormatInfo("[AutoTest] {0}", message);
         }
 
+        private static string _profileName;
+        private static Instrument? _instrument;
+        private static Difficulty? _difficulty;
+        private static bool? _bot;
+        private static double? _missFrom;
+        private static double _missTo;
+
+        private static bool UsesExtendedArgs =>
+            _profileName != null || _instrument.HasValue || _difficulty.HasValue || _bot.HasValue || _missFrom.HasValue;
+
+        /// <returns>False if an argument is invalid.</returns>
+        private static bool ParseExtendedArgs(string[] args)
+        {
+            _profileName = GetArg(args, "-mp-profile", null);
+            _instrument = null;
+            _difficulty = null;
+            _bot = null;
+            _missFrom = null;
+
+            string instrument = GetArg(args, "-mp-instrument", null);
+            if (instrument != null)
+            {
+                if (!Enum.TryParse<Instrument>(instrument, true, out var parsed))
+                {
+                    Log($"FAIL: unknown instrument '{instrument}'");
+                    return false;
+                }
+                _instrument = parsed;
+            }
+
+            string difficulty = GetArg(args, "-mp-difficulty", null);
+            if (difficulty != null)
+            {
+                if (!Enum.TryParse<Difficulty>(difficulty, true, out var parsed))
+                {
+                    Log($"FAIL: unknown difficulty '{difficulty}'");
+                    return false;
+                }
+                _difficulty = parsed;
+            }
+
+            string bot = GetArg(args, "-mp-bot", null);
+            if (bot != null)
+            {
+                _bot = bot == "1";
+            }
+
+            string miss = GetArg(args, "-mp-miss", null);
+            if (miss != null)
+            {
+                var parts = miss.Split('-');
+                if (parts.Length != 2 ||
+                    !double.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out double from) ||
+                    !double.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out double to))
+                {
+                    Log($"FAIL: -mp-miss expects <from>-<to> in seconds, got '{miss}'");
+                    return false;
+                }
+                _missFrom = from;
+                _missTo = to;
+            }
+            return true;
+        }
+
         private static async UniTaskVoid Run(string role, string address, string[] args)
         {
             bool passed = false;
+            if (!ParseExtendedArgs(args))
+            {
+                Log("FAIL");
+                await UniTask.Delay(TimeSpan.FromSeconds(2));
+                Application.Quit(1);
+                return;
+            }
             _leaveAfter = double.Parse(GetArg(args, "-mp-leave-after", "-1"), System.Globalization.CultureInfo.InvariantCulture);
             _expectLeave = Array.IndexOf(args, "-mp-expect-leave") >= 0;
             try
@@ -101,31 +180,132 @@ namespace YARG.Multiplayer
             // Lets the menu finish setting itself up
             await UniTask.Delay(TimeSpan.FromSeconds(3));
 
-            foreach (var extra in PlayerContainer.Players.Where(p => !p.SittingOut).Skip(1).ToList())
+            YargPlayer player;
+            if (_profileName != null)
             {
-                extra.SittingOut = true;
-            }
-
-            var player = PlayerContainer.Players.FirstOrDefault(p => !p.SittingOut);
-            if (player == null)
-            {
-                var profile = PlayerContainer.Profiles.FirstOrDefault(p => p.IsBot) ?? PlayerContainer.Profiles.FirstOrDefault();
+                var profile = PlayerContainer.Profiles.FirstOrDefault(p => p.Name == _profileName);
                 if (profile == null)
                 {
-                    Log("FAIL: no profile to play with");
+                    var instrument = _instrument ?? Instrument.FiveFretGuitar;
+                    profile = new YargProfile
+                    {
+                        Name = _profileName,
+                        GameMode = instrument.ToNativeGameMode(),
+                        CurrentInstrument = instrument,
+                    };
+                    PlayerContainer.AddProfile(profile);
+                    PlayerContainer.SaveProfiles();
+                    Log($"Created profile {_profileName}");
+                }
+
+                foreach (var extra in PlayerContainer.Players.Where(p => !p.SittingOut && p.Profile != profile).ToList())
+                {
+                    extra.SittingOut = true;
+                }
+                player = PlayerContainer.Players.FirstOrDefault(p => p.Profile == profile);
+                if (player == null)
+                {
+                    player = PlayerContainer.CreatePlayerFromProfile(profile, true);
+                }
+                if (player == null)
+                {
+                    Log($"FAIL: couldn't create a player for profile {_profileName}");
                     return false;
                 }
-                player = PlayerContainer.CreatePlayerFromProfile(profile, true);
+                player.SittingOut = false;
+            }
+            else
+            {
+                foreach (var extra in PlayerContainer.Players.Where(p => !p.SittingOut).Skip(1).ToList())
+                {
+                    extra.SittingOut = true;
+                }
+
+                player = PlayerContainer.Players.FirstOrDefault(p => !p.SittingOut);
+                if (player == null)
+                {
+                    var profile = PlayerContainer.Profiles.FirstOrDefault(p => p.IsBot) ?? PlayerContainer.Profiles.FirstOrDefault();
+                    if (profile == null)
+                    {
+                        Log("FAIL: no profile to play with");
+                        return false;
+                    }
+                    player = PlayerContainer.CreatePlayerFromProfile(profile, true);
+                }
             }
 
-            player.Profile.IsBot = true;
-            Log($"Playing as {player.Profile.Name} (bot)");
+            if (_instrument.HasValue)
+            {
+                player.Profile.GameMode = _instrument.Value.ToNativeGameMode();
+                player.Profile.CurrentInstrument = _instrument.Value;
+            }
+            if (_difficulty.HasValue)
+            {
+                player.Profile.CurrentDifficulty = _difficulty.Value;
+            }
+
+            if (_missFrom.HasValue)
+            {
+                if (player.Profile.GameMode != GameMode.FiveFretGuitar)
+                {
+                    Log($"FAIL: -mp-miss needs a five-fret guitar profile, got {player.Profile.GameMode}");
+                    return false;
+                }
+                player.Profile.IsBot = false;
+            }
+            else if (_bot.HasValue)
+            {
+                player.Profile.IsBot = _bot.Value;
+            }
+            else if (_profileName == null)
+            {
+                // Without a profile argument the local profile always plays as a bot
+                player.Profile.IsBot = true;
+            }
+
+            if (UsesExtendedArgs)
+            {
+                PlayerContainer.SaveProfiles();
+            }
+
+            Log($"Playing as {player.Profile.Name} bot={(player.Profile.IsBot ? 1 : 0)} " +
+                $"instrument={player.Profile.CurrentInstrument} difficulty={player.Profile.CurrentDifficulty}");
             return true;
         }
 
-        private static void PickPart(IMultiplayerSession session, SongEntry song)
+        /// <returns>False only when the requested instrument isn't in the song.</returns>
+        private static bool PickPart(IMultiplayerSession session, SongEntry song)
         {
             var profile = MultiplayerManager.Instance.LocalPlayer!.Profile;
+            if (_instrument.HasValue)
+            {
+                var wanted = _instrument.Value;
+                if (!song.HasInstrument(wanted))
+                {
+                    var available = EnumExtensions<Instrument>.Values.Where(song.HasInstrument);
+                    Log($"FAIL: {wanted} not in song; available: {string.Join(", ", available)}");
+                    return false;
+                }
+
+                var difficulties = _difficulty.HasValue
+                    ? new[] { _difficulty.Value }
+                    : EnumExtensions<Difficulty>.Values.Reverse().ToArray();
+                foreach (var difficulty in difficulties)
+                {
+                    if (song[wanted][difficulty])
+                    {
+                        profile.CurrentInstrument = wanted;
+                        profile.CurrentDifficulty = difficulty;
+                        session.SetLocalPart(wanted, difficulty);
+                        Log($"Picked {wanted} {difficulty}");
+                        return true;
+                    }
+                }
+                Log($"FAIL: {wanted} has no requested difficulty chart; difficulties: " +
+                    string.Join(", ", EnumExtensions<Difficulty>.Values.Where(d => song[wanted][d])));
+                return false;
+            }
+
             foreach (var instrument in profile.GameMode.PossibleInstrumentsForSong(song))
             {
                 foreach (var difficulty in EnumExtensions<Difficulty>.Values.Reverse())
@@ -136,11 +316,12 @@ namespace YARG.Multiplayer
                         profile.CurrentDifficulty = difficulty;
                         session.SetLocalPart(instrument, difficulty);
                         Log($"Picked {instrument} {difficulty}");
-                        return;
+                        return true;
                     }
                 }
             }
             Log("No part available for the song");
+            return true;
         }
 
         /// <summary>
@@ -191,7 +372,68 @@ namespace YARG.Multiplayer
             }
         }
 
+        private static YARG.Gameplay.GameManager _stemWatched;
+
+        private static void OnStemFraction(SongStem stem, double fraction)
+        {
+            double song = _stemWatched != null ? _stemWatched.SongTime : 0;
+            Log(string.Format(CultureInfo.InvariantCulture, "Stem {0} fraction={1:0.00} song={2:0.00}", stem, fraction, song));
+        }
+
+        private static void StopWatchingStems()
+        {
+            if (_stemWatched != null)
+            {
+                _stemWatched.StemAudibleFractionChanged -= OnStemFraction;
+                _stemWatched = null;
+            }
+        }
+
         private static async UniTask<bool> PlayThroughMatch(IMultiplayerSession session)
+        {
+            try
+            {
+                return await PlayThroughMatchCore(session);
+            }
+            finally
+            {
+                StopWatchingStems();
+            }
+        }
+
+        private static async UniTask<bool> ScriptLocalMisses(IMultiplayerSession session)
+        {
+            var manager = MultiplayerManager.Instance;
+            YARG.Gameplay.Player.FiveFretGuitarPlayer guitar = null;
+            if (!await WaitFor("the local guitar player", () =>
+            {
+                if (manager.Session != session)
+                {
+                    return true;
+                }
+                var gm = UnityEngine.Object.FindAnyObjectByType<YARG.Gameplay.GameManager>();
+                guitar = gm == null ? null : gm.Players.OfType<YARG.Gameplay.Player.FiveFretGuitarPlayer>()
+                    .FirstOrDefault(p => !p.Player.IsRemote && p.ChartNotes != null);
+                return guitar != null;
+            }))
+            {
+                return false;
+            }
+            if (guitar == null)
+            {
+                Log("FAIL: session ended before the guitar player was ready");
+                return false;
+            }
+
+            double notBefore = guitar.BaseEngine.CurrentTime + 0.5;
+            var inputs = ScriptedFiveFretInputs.Generate(guitar.ChartNotes, _missFrom.Value, _missTo, notBefore);
+            guitar.SetScriptedInputs(inputs);
+            Log(string.Format(CultureInfo.InvariantCulture, "Scripted {0} inputs, missing from {1:0.00} to {2:0.00}",
+                inputs.Count, _missFrom.Value, _missTo));
+            return true;
+        }
+
+        private static async UniTask<bool> PlayThroughMatchCore(IMultiplayerSession session)
         {
             var manager = MultiplayerManager.Instance;
             if (!await WaitFor("gameplay", () => manager.Session != session ||
@@ -206,6 +448,19 @@ namespace YARG.Multiplayer
             }
 
             if (!await WaitFor("the song to start", () => manager.Session != session || session.StartTimeLocal.HasValue))
+            {
+                return false;
+            }
+
+            StopWatchingStems();
+            var watched = UnityEngine.Object.FindAnyObjectByType<YARG.Gameplay.GameManager>();
+            if (watched != null)
+            {
+                _stemWatched = watched;
+                watched.StemAudibleFractionChanged += OnStemFraction;
+            }
+
+            if (_missFrom.HasValue && !await ScriptLocalMisses(session))
             {
                 return false;
             }
@@ -241,6 +496,7 @@ namespace YARG.Multiplayer
                     Log($"Result: {card.Player.Profile.Name} remote={card.Player.IsRemote} " +
                         $"score={card.Stats.TotalScore} hit={card.Stats.NotesHit}/{card.Stats.TotalNotes} " + DescribeStarPower(card.Stats));
                 }
+                Log($"Band: score={stats.Value.BandScore} stars={stats.Value.BandStars}");
             }
 
             await UniTask.Delay(TimeSpan.FromSeconds(SCORE_SCREEN_SECONDS));
@@ -295,7 +551,10 @@ namespace YARG.Multiplayer
                     Log("FAIL: offering the song failed");
                     return false;
                 }
-                PickPart(session, song);
+                if (!PickPart(session, song))
+                {
+                    return false;
+                }
 
                 if (!await WaitFor("everybody to be ready", () => session.CanBeginLoad))
                 {
@@ -442,7 +701,10 @@ namespace YARG.Multiplayer
                     Log("FAIL: song marked as had but missing from the library");
                     return false;
                 }
-                PickPart(session, song);
+                if (!PickPart(session, song))
+                {
+                    return false;
+                }
 
                 if (!await PlayThroughMatch(session))
                 {

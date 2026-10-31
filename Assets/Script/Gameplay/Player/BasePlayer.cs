@@ -338,6 +338,12 @@ namespace YARG.Gameplay.Player
                 // Scripted times are already engine times: no conversion and no calibration
                 while (_scriptedInputIndex < _scriptedInputs.Count && _scriptedInputs[_scriptedInputIndex].Time <= time)
                 {
+                    // Same guard as OnGameInput: a failed player takes no more input
+                    if (PlayerHasFailed)
+                    {
+                        break;
+                    }
+
                     var input = _scriptedInputs[_scriptedInputIndex++];
 
                     BaseEngine.QueueInput(ref input);
