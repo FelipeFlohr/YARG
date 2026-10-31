@@ -3,6 +3,7 @@ using Cysharp.Threading.Tasks;
 using UnityEngine;
 using YARG.Core;
 using YARG.Core.Extensions;
+using YARG.Helpers.Extensions;
 using YARG.Core.Song;
 using YARG.Localization;
 using YARG.Menu;
@@ -120,7 +121,11 @@ namespace YARG.Multiplayer
 
             var profile = player.Profile;
             var dialog = DialogManager.Instance.ShowList(Localize.Key("Menu.Multiplayer.ChoosePart"));
-            foreach (var instrument in profile.GameMode.PossibleInstrumentsForSong(song))
+            // A profile in a game mode without a track (left over from an older version) has no part to play
+            var instruments = profile.GameMode.HasGameplayTrack()
+                ? profile.GameMode.PossibleInstrumentsForSong(song)
+                : Enumerable.Empty<Instrument>();
+            foreach (var instrument in instruments)
             {
                 // The game mode lists vocal parts the song may not have
                 if (!PartDifficulty.HasPlayablePart(song, instrument))

@@ -13,10 +13,10 @@ namespace YARG.Multiplayer.Transport
     /// <see cref="Send"/> nor <see cref="Poll"/> ever blocks on the network.
     /// </summary>
     /// <remarks>
-    /// The writer thread sends an empty frame (a heartbeat) whenever the connection has been idle for the heartbeat
-    /// interval, and the reader drops a connection that received nothing for the timeout. Both run off the main
-    /// thread, so a peer whose game is busy (loading a song) stays connected while one whose network went away
-    /// is dropped within the timeout.
+    /// After <see cref="StartKeepAlive"/>, the writer thread sends an empty frame (a heartbeat) whenever the connection
+    /// has been idle for the heartbeat interval, and the reader drops a connection that received nothing for the
+    /// timeout. Both run off the main thread, so a peer whose game is busy (loading a song) stays connected while one
+    /// whose network went away is dropped within the timeout.
     /// </remarks>
     public sealed class TcpTransport : INetTransport
     {
@@ -33,6 +33,7 @@ namespace YARG.Multiplayer.Transport
             public readonly BlockingCollection<byte[]>  Outgoing = new();
             public          TcpClient?                  Client;
             public          long                        PendingBytes;
+            public volatile bool                        KeepAlive;
             private         int                         _closed;
 
             public Connection(int peerId)
@@ -73,7 +74,7 @@ namespace YARG.Multiplayer.Transport
         /// </summary>
         public int LocalPort => _listener != null ? ((IPEndPoint) _listener.LocalEndpoint).Port : 0;
 
-        public TcpTransport(double heartbeatIntervalSeconds = 1, double timeoutSeconds = 5)
+        public TcpTransport(double heartbeatIntervalSeconds = 1, double timeoutSeconds = 10)
         {
             _heartbeatIntervalMs = (int) (heartbeatIntervalSeconds * 1000);
             _timeoutMs = (int) (timeoutSeconds * 1000);
@@ -178,6 +179,14 @@ namespace YARG.Multiplayer.Transport
                 : 0;
         }
 
+        public void StartKeepAlive(int peerId)
+        {
+            if (_connections.TryGetValue(peerId, out var connection))
+            {
+                connection.KeepAlive = true;
+            }
+        }
+
         public void Disconnect(int peerId)
         {
             if (_connections.TryRemove(peerId, out var connection) && connection.TryClose(true))
@@ -250,10 +259,17 @@ namespace YARG.Multiplayer.Transport
             string reason;
             try
             {
-                connection.Client!.ReceiveTimeout = _timeoutMs;
-                var stream = connection.Client.GetStream();
+                var stream = connection.Client!.GetStream();
+                bool timeoutSet = false;
                 while (true)
                 {
+                    // Applies from the next read on; the one in progress may wait for the peer's next message
+                    if (!timeoutSet && connection.KeepAlive)
+                    {
+                        connection.Client.ReceiveTimeout = _timeoutMs;
+                        timeoutSet = true;
+                    }
+
                     int read = stream.Read(buffer, 0, buffer.Length);
                     if (read == 0)
                     {
@@ -304,7 +320,7 @@ namespace YARG.Multiplayer.Transport
                     {
                         break;
                     }
-                    else
+                    else if (connection.KeepAlive)
                     {
                         stream.Write(HEARTBEAT, 0, HEARTBEAT.Length);
                     }

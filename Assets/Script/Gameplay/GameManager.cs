@@ -753,16 +753,9 @@ namespace YARG.Gameplay
             }
 
             // Nothing else is on screen while the others finish, so say who we are waiting for
-            bool toasted = false;
-            _remoteFinalFrames = await MultiplayerGameplay.AwaitFinishedFrames(MULTIPLAYER_FINISH_TIMEOUT, names =>
-            {
-                if (!toasted)
-                {
-                    toasted = true;
-                    ToastManager.ToastInformation(Localize.KeyFormat("Menu.Multiplayer.WaitingForPlayersToFinish",
-                        Localize.List(names)));
-                }
-            });
+            _remoteFinalFrames = await MultiplayerGameplay.AwaitFinishedFrames(MULTIPLAYER_FINISH_TIMEOUT,
+                names => ToastManager.ToastInformation(Localize.KeyFormat("Menu.Multiplayer.WaitingForPlayersToFinish",
+                    Localize.List(names))));
 
             // The scene changed, or the session ended and went back to the menu
             if (this == null || !MultiplayerGameplay.IsInMatch)

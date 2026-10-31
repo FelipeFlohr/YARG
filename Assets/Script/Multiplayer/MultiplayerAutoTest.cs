@@ -5,6 +5,7 @@ using Cysharp.Threading.Tasks;
 using UnityEngine;
 using YARG.Core;
 using YARG.Core.Extensions;
+using YARG.Helpers.Extensions;
 using YARG.Core.Logging;
 using YARG.Core.Audio;
 using YARG.Core.Game;
@@ -91,10 +92,9 @@ namespace YARG.Multiplayer
                     Log($"FAIL: unknown instrument '{instrument}'");
                     return false;
                 }
-                // The gameplay scene has no pro guitar track, and no profile can pick that game mode
-                if (parsed.ToNativeGameMode() == GameMode.ProGuitar)
+                if (!parsed.ToNativeGameMode().HasGameplayTrack())
                 {
-                    Log($"FAIL: {parsed} can't be played, the game has no pro guitar track");
+                    Log($"FAIL: {parsed} can't be played, the game has no {parsed.ToNativeGameMode()} track");
                     return false;
                 }
                 _instrument = parsed;

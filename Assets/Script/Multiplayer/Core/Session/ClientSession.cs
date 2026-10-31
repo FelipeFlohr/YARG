@@ -177,6 +177,7 @@ namespace YARG.Multiplayer.Session
                 case Welcome m:
                     LocalPlayerId = m.PlayerId;
                     _welcomed = true;
+                    _transport.StartKeepAlive(HOST_PEER_ID);
                     break;
                 case Reject m:
                     RejectReason = m;
