@@ -80,15 +80,13 @@ namespace YARG.Multiplayer.Transport
 
             StartThread(() =>
             {
-                var client = new TcpClient(AddressFamily.InterNetworkV6) { NoDelay = true };
-                client.Client.DualMode = true;
+                TcpClient client;
                 try
                 {
-                    client.Connect(host, port);
+                    client = ConnectToAny(host, port);
                 }
                 catch (Exception e) when (e is SocketException || e is IOException || e is ArgumentException)
                 {
-                    client.Close();
                     if (connection.TryClose(false))
                     {
                         _events.Enqueue(NetEvent.Disconnected(HOST_PEER_ID, $"could not connect: {e.Message}"));
@@ -106,6 +104,31 @@ namespace YARG.Multiplayer.Transport
                 connection.Client = client;
                 Run(connection);
             }, "Multiplayer connect");
+        }
+
+        /// <summary>
+        /// Tries each resolved address with a socket of its own family. A dual-mode IPv6 socket
+        /// can't connect to an IPv4 address under Mono (it fails with "socket is not connected").
+        /// </summary>
+        private static TcpClient ConnectToAny(string host, int port)
+        {
+            Exception? lastError = null;
+            foreach (var address in Dns.GetHostAddresses(host))
+            {
+                var client = new TcpClient(address.AddressFamily) { NoDelay = true };
+                try
+                {
+                    client.Connect(address, port);
+                    return client;
+                }
+                catch (SocketException e)
+                {
+                    client.Close();
+                    lastError = e;
+                }
+            }
+
+            throw lastError ?? new SocketException((int) SocketError.HostNotFound);
         }
 
         public void Send(int peerId, byte[] message)
