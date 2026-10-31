@@ -11,7 +11,7 @@ SCENARIO = {
 }
 
 
-def make_log(bot=0, guit_hit=90, bass_score=2000, band="score=3000 stars=4", passed=True,
+def make_log(bot=0, guit_hit=90, bass_score=2000, band="score=3000 stars=4 players=2", passed=True,
              stems=None, remote=0):
     if stems is None:
         stems = [("Guitar", "0.00", "30.50"), ("Guitar", "1.00", "40.60")]
@@ -44,8 +44,19 @@ class CheckTests(unittest.TestCase):
 
     def test_fails_on_band_mismatch(self):
         l = logs()
-        l["bass"] = make_log(bot=1, remote=1, band="score=3001 stars=4")
+        l["bass"] = make_log(bot=1, remote=1, band="score=3001 stars=4 players=2")
         self.assertTrue(any("band" in e for e in c.check(SCENARIO, l)))
+
+    def test_fails_on_player_count_mismatch(self):
+        l = logs()
+        l["bass"] = make_log(bot=1, remote=1, band="score=3000 stars=4 players=1")
+        self.assertTrue(any("band" in e for e in c.check(SCENARIO, l)))
+
+    def test_fails_when_band_line_has_no_player_count(self):
+        l = logs()
+        l["host"] = make_log(band="score=3000 stars=4")
+        l["bass"] = make_log(bot=1, remote=1, band="score=3000 stars=4")
+        self.assertTrue(any("no Band line" in e for e in c.check(SCENARIO, l)))
 
     def test_fails_when_a_machine_never_muted(self):
         l = logs()

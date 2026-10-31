@@ -7,7 +7,7 @@ PREFIX = "[AutoTest] "
 PLAYING_RE = re.compile(r"^Playing as (\S+) bot=(\d)")
 STEM_RE = re.compile(r"^Stem (\S+) fraction=(-?[\d.]+) song=(-?[\d.]+)")
 RESULT_RE = re.compile(r"^Result: (\S+) (?:remote=\S+ )?score=(-?\d+) hit=(\d+)/(\d+)")
-BAND_RE = re.compile(r"^Band: score=(-?\d+) stars=(\S+)")
+BAND_RE = re.compile(r"^Band: score=(-?\d+) stars=(\S+) players=(\d+)")
 
 UNMUTE_SLACK = 5.0
 MUTE_SLACK = 2.0
@@ -38,7 +38,7 @@ def parse_log(text):
             continue
         m = BAND_RE.match(msg)
         if m:
-            info["band"] = (int(m.group(1)), m.group(2))
+            info["band"] = (int(m.group(1)), m.group(2), int(m.group(3)))
     return info
 
 

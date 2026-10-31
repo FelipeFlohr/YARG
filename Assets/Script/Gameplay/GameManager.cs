@@ -807,7 +807,8 @@ namespace YARG.Gameplay
                         return (s.TotalScore, s.BandBonusScore);
                     }),
                     EngineManager.StarScoreThresholds);
-                YargLogger.LogFormatInfo("Band result: simulated {0}, authoritative {1}", bandScore, score);
+                YargLogger.LogFormatInfo("Band result: simulated {0}, authoritative {1}, players {2}",
+                    bandScore, score, _players.Count);
                 bandScore = score;
                 bandStars = stars;
             }
