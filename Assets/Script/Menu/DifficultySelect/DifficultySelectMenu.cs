@@ -1330,15 +1330,7 @@ namespace YARG.Menu.DifficultySelect
                 }
             }
 
-            return entry.HasInstrument(instrument) || instrument switch
-            {
-                // Allow 5 -> 4-lane conversions to be played on 4-lane
-                Instrument.FourLaneDrums or
-                Instrument.ProDrums      => entry.HasInstrument(Instrument.FiveLaneDrums),
-                // Allow 4 -> 5-lane conversions to be played on 5-lane
-                Instrument.FiveLaneDrums => entry.HasInstrument(Instrument.ProDrums),
-                _ => false
-            };
+            return PartDifficulty.HasPlayablePart(entry, instrument);
         }
 
         private static bool HasPlayableDifficulty(SongEntry entry, in Instrument instrument, in Difficulty difficulty)

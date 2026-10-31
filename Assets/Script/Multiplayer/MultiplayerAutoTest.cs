@@ -311,6 +311,11 @@ namespace YARG.Multiplayer
 
             foreach (var instrument in profile.GameMode.PossibleInstrumentsForSong(song))
             {
+                if (!PartDifficulty.HasPlayablePart(song, instrument))
+                {
+                    continue;
+                }
+
                 foreach (var difficulty in EnumExtensions<Difficulty>.Values.Reverse())
                 {
                     if (PartDifficulty.HasPlayableDifficulty(song, instrument, difficulty))
@@ -499,7 +504,8 @@ namespace YARG.Multiplayer
                     Log($"Result: {card.Player.Profile.Name} remote={card.Player.IsRemote} " +
                         $"score={card.Stats.TotalScore} hit={card.Stats.NotesHit}/{card.Stats.TotalNotes} " + DescribeStarPower(card.Stats));
                 }
-                Log($"Band: score={stats.Value.BandScore} stars={stats.Value.BandStars}");
+                Log($"Band: score={stats.Value.BandScore} stars={stats.Value.BandStars} " +
+                    $"players={stats.Value.PlayerScores.Length}");
             }
 
             await UniTask.Delay(TimeSpan.FromSeconds(SCORE_SCREEN_SECONDS));
@@ -644,7 +650,14 @@ namespace YARG.Multiplayer
             {
                 player.Profile.IsBot = true;
                 var profile = player.Profile;
-                var instrument = profile.GameMode.PossibleInstrumentsForSong(song).First();
+                var candidates = profile.GameMode.PossibleInstrumentsForSong(song)
+                    .Where(i => PartDifficulty.HasPlayablePart(song, i)).ToList();
+                if (candidates.Count == 0)
+                {
+                    Log($"FAIL: {profile.Name} has no playable part in the song");
+                    return false;
+                }
+                var instrument = candidates[0];
                 profile.CurrentInstrument = instrument;
                 profile.CurrentDifficulty = EnumExtensions<Difficulty>.Values.Reverse()
                     .First(d => PartDifficulty.HasPlayableDifficulty(song, instrument, d));

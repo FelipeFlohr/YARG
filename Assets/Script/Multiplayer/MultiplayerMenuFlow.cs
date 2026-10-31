@@ -122,6 +122,12 @@ namespace YARG.Multiplayer
             var dialog = DialogManager.Instance.ShowList(Localize.Key("Menu.Multiplayer.ChoosePart"));
             foreach (var instrument in profile.GameMode.PossibleInstrumentsForSong(song))
             {
+                // The game mode lists vocal parts the song may not have
+                if (!PartDifficulty.HasPlayablePart(song, instrument))
+                {
+                    continue;
+                }
+
                 foreach (var difficulty in EnumExtensions<Difficulty>.Values)
                 {
                     if (!PartDifficulty.HasPlayableDifficulty(song, instrument, difficulty))
