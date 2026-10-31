@@ -17,6 +17,7 @@ using YARG.Localization;
 using YARG.Menu.Navigation;
 using YARG.Menu.Persistent;
 using YARG.Menu.Filters;
+using YARG.Multiplayer;
 using YARG.Player;
 using YARG.Song;
 
@@ -553,6 +554,21 @@ namespace YARG.Menu.DifficultySelect
                 speed = Mathf.Clamp(speed, 0.1f, 50.0f);
                 _songSpeed = speed;
                 GlobalVariables.State.SongSpeed = speed;
+
+                // Online, the host offers the song and starts it from the lobby instead
+                if (MultiplayerManager.IsHosting)
+                {
+                    var manager = MultiplayerManager.Instance;
+                    var localPlayer = manager.LocalPlayer;
+                    if (manager.OfferSong(GlobalVariables.State.CurrentSong, speed) && localPlayer != null)
+                    {
+                        manager.Session.SetLocalPart(localPlayer.Profile.CurrentInstrument,
+                            localPlayer.Profile.CurrentDifficulty);
+                    }
+
+                    MultiplayerMenuFlow.OpenLobby();
+                    return;
+                }
 
                 GlobalVariables.Instance.LoadScene(SceneIndex.Gameplay);
                 return;

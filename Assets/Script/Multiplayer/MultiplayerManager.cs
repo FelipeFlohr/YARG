@@ -54,6 +54,7 @@ namespace YARG.Multiplayer
         private SongReceiver _receiver;
         private SongEntry    _offeredSong;
         private int          _downloadAttempts;
+        private SceneIndex   _lastScene;
 
 #nullable enable
         public IMultiplayerSession? Session { get; private set; }
@@ -164,21 +165,46 @@ namespace YARG.Multiplayer
             return true;
         }
 
+        private void Awake()
+        {
+            _lastScene = GlobalVariables.Instance.CurrentScene;
+        }
+
         private void Update()
         {
-            if (Session == null)
+            var scene = GlobalVariables.Instance.CurrentScene;
+            if (scene != _lastScene)
             {
-                return;
+                _lastScene = scene;
+                if (scene == SceneIndex.Menu && Session != null)
+                {
+                    OnReturnedToMenu();
+                }
             }
 
-            try
+            if (Session != null)
             {
-                Session.Tick();
+                try
+                {
+                    Session.Tick();
+                }
+                catch (Exception e)
+                {
+                    YargLogger.LogException(e, "Error while updating the multiplayer session");
+                }
             }
-            catch (Exception e)
+
+            MultiplayerMenuFlow.Update();
+        }
+
+        private void OnReturnedToMenu()
+        {
+            // Back from the score screen: the host takes everybody back to the lobby
+            if (Session is HostSession host && host.State == SessionState.Results)
             {
-                YargLogger.LogException(e, "Error while updating the multiplayer session");
+                host.ReturnToLobby();
             }
+            MultiplayerMenuFlow.RequestOpenLobby();
         }
 
         private void OnApplicationQuit()
@@ -205,6 +231,7 @@ namespace YARG.Multiplayer
         {
             session.Ended += OnSessionEnded;
             session.BeginLoadRequested += OnBeginLoadRequested;
+            session.LobbyChanged += MultiplayerMenuFlow.OnLobbyChanged;
         }
 
         private void EndSession()

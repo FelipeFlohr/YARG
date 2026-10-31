@@ -5,6 +5,7 @@ using YARG.Menu.MusicLibrary;
 using YARG.Menu.Navigation;
 using YARG.Menu.Persistent;
 using YARG.Menu.Settings;
+using YARG.Multiplayer;
 using YARG.Settings;
 
 namespace YARG.Menu.Main
@@ -90,6 +91,11 @@ namespace YARG.Menu.Main
         public void Replays()
         {
             MenuManager.Instance.PushMenu(MenuManager.Menu.History);
+        }
+
+        public void Multiplayer()
+        {
+            MultiplayerMenuFlow.OpenEntry();
         }
 
         public void Credits()
