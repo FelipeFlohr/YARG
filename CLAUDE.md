@@ -6,19 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Fork do YARG (Unity 6000.3.5f2, URP). O backend fica no submódulo `YARG.Core` (fork `FelipeFlohr/YARG.Core`), que o Unity carrega como pacote local (`Packages/manifest.json` → `file:../YARG.Core/YARG.Core`).
 
-## Ambiente desta máquina
+## Ambiente
 
-Ubuntu Server 24.04, sem sudo, GPU integrada Intel HD 630, sem display. Todas as ferramentas são locais do usuário:
-
-- `.NET SDK 10` + runtime 8 em `~/.dotnet`
-- `git-lfs` e `gh` em `~/.local/bin`
-- Unity Editor em `~/Unity/Hub/Editor/6000.3.5f2/Editor/Unity`
-
-Se `dotnet`/`gh` não estiverem no PATH do shell:
-
-```bash
-export DOTNET_ROOT=$HOME/.dotnet PATH=$HOME/.dotnet:$HOME/.local/bin:$PATH DOTNET_CLI_TELEMETRY_OPTOUT=1
-```
+As ferramentas da máquina (`dotnet`, `git-lfs`, `gh`, editor Unity) já devem estar no PATH. O caminho do executável do Unity 6000.3.5f2 fica na variável `UNITY_EDITOR`, definida no ambiente local; se ela não existir, pare e avise em vez de procurar o editor pelo disco.
 
 ## Verificação
 
@@ -43,8 +33,8 @@ cd Tests/YARG.Multiplayer.Tests && dotnet test
 Projeto Unity (lento; o primeiro import leva muito tempo; exige licença ativada). Compila os scripts em batchmode sem GPU:
 
 ```bash
-~/Unity/Hub/Editor/6000.3.5f2/Editor/Unity -batchmode -nographics -quit -projectPath "$PWD" -logFile - 2>&1 | tee /tmp/unity.log
-grep -E 'error CS|Compilation failed|Scripts have compiler errors' /tmp/unity.log
+"$UNITY_EDITOR" -batchmode -nographics -quit -projectPath "$PWD" -logFile - 2>&1 | tee "${TMPDIR:-/tmp}/unity.log"
+grep -E 'error CS|Compilation failed|Scripts have compiler errors' "${TMPDIR:-/tmp}/unity.log"
 ```
 
 Pacotes NuGet (`Assets/Packages`, fora do git) são restaurados pelo NuGetForUnity ao abrir o editor. Em batchmode o Unity aborta antes disso se o projeto não compila; se `Assets/Packages` estiver faltando, rode uma vez com `-ignorecompilererrors` para restaurar e depois repita sem a flag.
