@@ -192,6 +192,52 @@ namespace YARG.Multiplayer.Tests.Transport
         }
 
         [Test]
+        public void Tcp_SilentPeerTimesOut()
+        {
+            using var host = new TcpTransport(heartbeatIntervalSeconds: 0.1, timeoutSeconds: 0.5);
+            var hostEvents = new RecordingListener();
+            host.StartHost(0);
+
+            // A raw socket never sends heartbeats, like a peer whose network went away
+            using var raw = new TcpClient();
+            raw.Connect(IPAddress.Loopback, host.LocalPort);
+            PollUntil(() => hostEvents.Events.Contains("connected 1"), (host, hostEvents));
+
+            var watch = Stopwatch.StartNew();
+            PollUntil(() => hostEvents.Disconnects.Count == 1, (host, hostEvents));
+            Assert.That(watch.Elapsed, Is.LessThan(TimeSpan.FromSeconds(3)));
+            Assert.That(hostEvents.Disconnects[0].Reason, Does.Contain("timed out"));
+        }
+
+        [Test]
+        public void Tcp_HeartbeatsKeepConnectionAliveWhileNobodyPolls()
+        {
+            using var host = new TcpTransport(heartbeatIntervalSeconds: 0.1, timeoutSeconds: 0.5);
+            using var client = new TcpTransport(heartbeatIntervalSeconds: 0.1, timeoutSeconds: 0.5);
+            var hostEvents = new RecordingListener();
+            var clientEvents = new RecordingListener();
+
+            host.StartHost(0);
+            client.Connect("127.0.0.1", host.LocalPort);
+            PollUntil(() => hostEvents.Events.Contains("connected 1") && clientEvents.Events.Contains("connected 0"),
+                (host, hostEvents), (client, clientEvents));
+
+            // Both main threads "frozen" (as while loading a song) for several timeouts
+            Thread.Sleep(1500);
+            host.Poll(hostEvents);
+            client.Poll(clientEvents);
+            Assert.That(hostEvents.Disconnects, Is.Empty);
+            Assert.That(clientEvents.Disconnects, Is.Empty);
+            // Heartbeats are not messages
+            Assert.That(hostEvents.Messages, Is.Empty);
+            Assert.That(clientEvents.Messages, Is.Empty);
+
+            client.Send(0, new byte[] { 7 });
+            PollUntil(() => hostEvents.Messages.Count == 1, (host, hostEvents), (client, clientEvents));
+            Assert.That(hostEvents.Messages[0].Message, Is.EqualTo(new byte[] { 7 }));
+        }
+
+        [Test]
         public void InMemory_RoutesBetweenHostAndTwoClients()
         {
             var network = new InMemoryNetwork();
