@@ -324,9 +324,71 @@ namespace YARG.Settings
             }
         };
 
+        private static readonly string[] WebHiddenTabs =
+        {
+            "SongManager",
+            "FileManagement",
+            "LightingPeripherals",
+        };
+
+        private static readonly string[] WebHiddenSettings =
+        {
+            nameof(SettingContainer.OpenVenueFolder),
+            nameof(SettingContainer.DisableDefaultBackground),
+            nameof(SettingContainer.DisableGlobalBackgrounds),
+            nameof(SettingContainer.DisablePerSongBackgrounds),
+            nameof(SettingContainer.WaitForSongVideo),
+            nameof(SettingContainer.AllowRemoteContent),
+            nameof(SettingContainer.DiscordRichPresence),
+            nameof(SettingContainer.SaveMultiplayerSongs),
+            nameof(SettingContainer.ChooseMultiplayerSongsFolder),
+            nameof(SettingContainer.OutputMode),
+            nameof(SettingContainer.OutputDevice),
+            nameof(SettingContainer.AsioBufferSize),
+            nameof(SettingContainer.OpenAsioControlPanel),
+        };
+
+        // Matches OutputChannelDefault, OutputChannelSfx, ...
+        private const string WEB_HIDDEN_SETTING_PREFIX = "OutputChannel";
+
         static SettingsManager()
         {
             AllSettingsTabs.InsertRange(0, DisplayedSettingsTabs);
+
+            if (PlatformInfo.IsWeb)
+            {
+                RemoveWebHiddenSettings();
+            }
+        }
+
+        /// <summary>
+        /// The web build has no song folders, venues, audio devices or lighting peripherals, so the
+        /// settings that configure them are removed instead of shown as dead controls.
+        /// </summary>
+        private static void RemoveWebHiddenSettings()
+        {
+            DisplayedSettingsTabs.RemoveAll(tab => WebHiddenTabs.Contains(tab.Name));
+            AllSettingsTabs.RemoveAll(tab => WebHiddenTabs.Contains(tab.Name));
+
+            foreach (var tab in AllSettingsTabs.OfType<MetadataTab>())
+            {
+                tab.RemoveWhere(IsWebHidden);
+            }
+
+            static bool IsWebHidden(AbstractMetadata metadata)
+            {
+                return metadata switch
+                {
+                    FieldMetadata field => IsHiddenName(field.FieldName),
+                    ButtonRowMetadata row => row.Buttons.All(IsHiddenName),
+                    _ => false,
+                };
+            }
+
+            static bool IsHiddenName(string name)
+            {
+                return WebHiddenSettings.Contains(name) || name.StartsWith(WEB_HIDDEN_SETTING_PREFIX, StringComparison.Ordinal);
+            }
         }
 
         private static string SettingsFile => Path.Combine(PathHelper.PersistentDataPath, "settings.json");
@@ -377,6 +439,14 @@ namespace YARG.Settings
 
             // If null, recreate
             Settings ??= new SettingContainer();
+
+            if (PlatformInfo.IsWeb)
+            {
+                // The web build has no venue backgrounds to load
+                Settings.DisableDefaultBackground.SetValueWithoutNotify(true);
+                Settings.DisableGlobalBackgrounds.SetValueWithoutNotify(true);
+                Settings.DisablePerSongBackgrounds.SetValueWithoutNotify(true);
+            }
 
             AudioOutputMode outputMode = GlobalAudioHandler.GetOutputMode(Settings.OutputDevice.Value);
             Settings.OutputMode.SetValueWithoutNotify(outputMode);

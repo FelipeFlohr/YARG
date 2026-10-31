@@ -1,6 +1,7 @@
 using TMPro;
 using UnityEngine;
 using YARG.Core.Input;
+using YARG.Core.Logging;
 using YARG.Menu.MusicLibrary;
 using YARG.Menu.Navigation;
 using YARG.Menu.Persistent;
@@ -40,6 +41,8 @@ namespace YARG.Menu.Main
             {
                 SettingsMenu.Instance.gameObject.SetActive(true);
             }
+
+            YargLogger.LogInfo("Main menu ready");
         }
 
         private void OnEnable()

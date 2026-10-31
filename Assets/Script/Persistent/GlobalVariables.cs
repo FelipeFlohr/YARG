@@ -3,7 +3,11 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+#if UNITY_WEBGL && !UNITY_EDITOR
+using YARG.Audio.Web;
+#else
 using YARG.Audio.BASS;
+#endif
 using YARG.Core.Logging;
 using YARG.Core.Audio;
 using YARG.Helpers;
@@ -101,7 +105,11 @@ namespace YARG
             YargLogger.LogFormatInfo("Saved {0} profiles", savedCount);
 
             SettingsManager.LoadStartupSettings();
+#if UNITY_WEBGL && !UNITY_EDITOR
+            GlobalAudioHandler.Initialize<SilentAudioManager>();
+#else
             GlobalAudioHandler.Initialize<BassAudioManager>();
+#endif
 
             Players = new List<YargPlayer>();
 

@@ -159,6 +159,52 @@ namespace YARG.Settings.Metadata
             }
         }
 
+        /// <summary>
+        /// Removes the entries matching <paramref name="shouldRemove"/>, and then the headers that lost all of
+        /// their entries because of it. Headers that were already empty are kept (they host previews).
+        /// </summary>
+        public void RemoveWhere(System.Func<AbstractMetadata, bool> shouldRemove)
+        {
+            var kept = new List<AbstractMetadata>();
+            HeaderMetadata header = null;
+            bool headerLostEntries = false;
+            int headerEntries = 0;
+
+            void Flush()
+            {
+                if (header != null && !(headerLostEntries && headerEntries == 0))
+                {
+                    kept.Insert(kept.Count - headerEntries, header);
+                }
+            }
+
+            foreach (var metadata in _settings)
+            {
+                if (metadata is HeaderMetadata next)
+                {
+                    Flush();
+                    header = next;
+                    headerLostEntries = false;
+                    headerEntries = 0;
+                }
+                else if (shouldRemove(metadata))
+                {
+                    headerLostEntries = true;
+                }
+                else
+                {
+                    kept.Add(metadata);
+                    headerEntries++;
+                }
+            }
+
+            Flush();
+
+            _settings.Clear();
+            _settings.AddRange(kept);
+            _sectionsCache = null;
+        }
+
         // For collection initializer support
         public void Add(AbstractMetadata setting) => _settings.Add(setting);
         private List<AbstractMetadata>.Enumerator GetEnumerator() => _settings.GetEnumerator();

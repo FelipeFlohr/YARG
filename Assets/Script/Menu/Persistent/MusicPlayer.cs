@@ -3,6 +3,7 @@ using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using YARG.Helpers;
 using YARG.Settings;
 using YARG.Helpers.Extensions;
 using YARG.Core.Audio;
@@ -40,8 +41,8 @@ namespace YARG.Menu.Persistent
             // Wait until the loading is done
             await UniTask.WaitUntil(() => !LoadingScreen.IsActive);
 
-            // Disable if there are no songs to play
-            if (SongContainer.Count <= 0)
+            // Disable if there are no songs to play (the web build has no library)
+            if (PlatformInfo.IsWeb || SongContainer.Count <= 0)
             {
                 gameObject.SetActive(false);
                 return;
