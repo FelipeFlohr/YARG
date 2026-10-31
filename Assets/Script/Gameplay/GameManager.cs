@@ -194,6 +194,9 @@ namespace YARG.Gameplay
         // Final stats the remote players sent, by multiplayer player id
         private IReadOnlyDictionary<int, ReplayFrame> _remoteFinalFrames;
 
+        // The stats sent in the Finished message, so the local result matches what the others add up
+        private BaseStats _localFinalStats;
+
         private StemMixer _mixer;
         public  StemMixer  Mixer => _mixer;
 
@@ -746,7 +749,7 @@ namespace YARG.Gameplay
             var localPlayer = _players.FirstOrDefault(player => !player.Player.IsRemote);
             if (localPlayer != null)
             {
-                MultiplayerGameplay.SendFinished(localPlayer);
+                _localFinalStats = MultiplayerGameplay.SendFinished(localPlayer);
             }
 
             _remoteFinalFrames = await MultiplayerGameplay.AwaitFinishedFrames(MULTIPLAYER_FINISH_TIMEOUT);
@@ -769,6 +772,10 @@ namespace YARG.Gameplay
                 _remoteFinalFrames.TryGetValue(player.Player.RemotePlayerId, out var frame))
             {
                 return frame.Stats;
+            }
+            if (!player.Player.IsRemote && _localFinalStats != null)
+            {
+                return _localFinalStats;
             }
             return player.BaseStats;
         }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Cysharp.Threading.Tasks;
+using YARG.Core.Engine;
 using YARG.Core.Input;
 using YARG.Core.Logging;
 using YARG.Core.Replays;
@@ -170,9 +171,20 @@ namespace YARG.Multiplayer
             return session.StartTimeLocal.HasValue && Now >= session.StartTimeLocal.Value;
         }
 
-        public static void SendFinished(BasePlayer localPlayer)
+        /// <returns>
+        /// The final stats exactly as the other machines receive them (after the codec round trip), so the
+        /// local result uses the same numbers; null without a session.
+        /// </returns>
+        public static BaseStats SendFinished(BasePlayer localPlayer)
         {
-            _session?.SendGameMessage(new Finished(_session.LocalPlayerId, EncodeFrame(localPlayer)));
+            if (_session == null)
+            {
+                return null;
+            }
+
+            var bytes = EncodeFrame(localPlayer);
+            _session.SendGameMessage(new Finished(_session.LocalPlayerId, bytes));
+            return ReplayFrameCodec.Decode(bytes).Stats;
         }
 
         /// <summary>
