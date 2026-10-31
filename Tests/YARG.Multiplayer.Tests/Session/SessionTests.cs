@@ -24,17 +24,21 @@ namespace YARG.Multiplayer.Tests.Session
             public readonly List<ClientSession> Clients = new();
             public readonly List<string>        Log     = new();
 
-            public Harness(int chunksPerTick = 16)
+            private readonly double _timeoutSeconds;
+
+            public Harness(int chunksPerTick = 16, double timeoutSeconds = 5)
             {
+                _timeoutSeconds = timeoutSeconds;
                 Host = new HostSession(Network.CreateHost(),
-                    new SessionConfig(VERSION, "Host", chunksPerTick: chunksPerTick, log: Log.Add), () => Now);
+                    new SessionConfig(VERSION, "Host", timeoutSeconds: timeoutSeconds,
+                        chunksPerTick: chunksPerTick, log: Log.Add), () => Now);
                 Host.Start(ProtocolInfo.DefaultPort);
             }
 
             public ClientSession AddClient(string name, double clockOffset = 0, string version = VERSION)
             {
-                var client = new ClientSession(Network.CreateClient(), new SessionConfig(version, name),
-                    () => Now + clockOffset);
+                var client = new ClientSession(Network.CreateClient(),
+                    new SessionConfig(version, name, timeoutSeconds: _timeoutSeconds), () => Now + clockOffset);
                 Clients.Add(client);
                 client.Connect("ignored", ProtocolInfo.DefaultPort);
                 Pump();
@@ -230,6 +234,69 @@ namespace YARG.Multiplayer.Tests.Session
 
             h.Advance(0.2, tickClients: false);
             Assert.That(PlayerIn(h.Host, 1).Status, Is.EqualTo(LobbyPlayerStatus.Left));
+        }
+
+        [Test]
+        public void Client_WithoutWelcome_GivesUpAfterTheConnectTimeout()
+        {
+            // The long in-session timeout must not apply while joining: the host here never answers
+            using var h = new Harness(timeoutSeconds: 30);
+            var client = new ClientSession(h.Network.CreateClient(),
+                new SessionConfig(VERSION, "Ana", timeoutSeconds: 30), () => h.Now);
+            h.Clients.Add(client);
+            client.Connect("ignored", ProtocolInfo.DefaultPort);
+
+            for (int i = 0; i < 95; i++)
+            {
+                h.Now += 0.1;
+                client.Tick();
+            }
+            Assert.That(client.State, Is.Not.EqualTo(SessionState.Ended), "still within 10 s");
+
+            for (int i = 0; i < 20; i++)
+            {
+                h.Now += 0.1;
+                client.Tick();
+            }
+            Assert.That(client.State, Is.EqualTo(SessionState.Ended), "gave up after about 10 s, not 30 s");
+        }
+
+        [Test]
+        public void ConnectedClient_SurvivesTheLongTimeoutOfSilence()
+        {
+            using var h = new Harness(timeoutSeconds: 30);
+            var a = h.AddClient("Ana");
+            Assert.That(a.LocalPlayerId, Is.EqualTo(1));
+
+            // The host stays silent (busy loading); only the client keeps ticking
+            for (int i = 0; i < 290; i++)
+            {
+                h.Now += 0.1;
+                a.Tick();
+            }
+            Assert.That(a.State, Is.Not.EqualTo(SessionState.Ended), "29 s of silence is tolerated");
+
+            for (int i = 0; i < 30; i++)
+            {
+                h.Now += 0.1;
+                a.Tick();
+            }
+            Assert.That(a.State, Is.EqualTo(SessionState.Ended), "30 s of silence is not");
+        }
+
+        [Test]
+        public void Host_DropsAPeerThatNeverSaysHelloAfterTheConnectTimeout()
+        {
+            using var h = new Harness(timeoutSeconds: 30);
+            var silent = h.Network.CreateClient();
+            silent.Connect("ignored", ProtocolInfo.DefaultPort);
+            h.Pump();
+
+            h.Advance(9, tickClients: false);
+            Assert.That(h.Log, Has.None.Contains("timed out"));
+
+            h.Advance(2, tickClients: false);
+            Assert.That(h.Log, Has.Some.Contains("timed out"));
         }
 
         [Test]

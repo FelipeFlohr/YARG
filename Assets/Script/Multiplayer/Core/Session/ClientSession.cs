@@ -22,6 +22,7 @@ namespace YARG.Multiplayer.Session
         private readonly ClockSync     _clockSync = new();
 
         private bool   _connected;
+        private bool   _welcomed;
         private double _lastHeard;
         private double _lastPing = double.NegativeInfinity;
 
@@ -78,7 +79,8 @@ namespace YARG.Multiplayer.Session
                 Send(new Ping(now));
             }
 
-            if (now - _lastHeard > _config.TimeoutSeconds)
+            double limit = _welcomed ? _config.TimeoutSeconds : _config.ConnectTimeoutSeconds;
+            if (now - _lastHeard > limit)
             {
                 _transport.Disconnect(HOST_PEER_ID);
                 End("connection to the host timed out");
@@ -174,6 +176,7 @@ namespace YARG.Multiplayer.Session
             {
                 case Welcome m:
                     LocalPlayerId = m.PlayerId;
+                    _welcomed = true;
                     break;
                 case Reject m:
                     RejectReason = m;
