@@ -120,6 +120,9 @@ namespace YARG.Gameplay.Player
 
         private int _replayInputIndex;
 
+        private List<GameInput> _scriptedInputs;
+        private int _scriptedInputIndex;
+
         /// <summary>
         /// How far behind the local song time a remote player's engine currently is.
         /// Its track is drawn this much in the past so notes and hits line up.
@@ -330,12 +333,39 @@ namespace YARG.Gameplay.Player
                 }
             }
 
+            if (_scriptedInputs != null && !Player.IsReplay)
+            {
+                // Scripted times are already engine times: no conversion and no calibration
+                while (_scriptedInputIndex < _scriptedInputs.Count && _scriptedInputs[_scriptedInputIndex].Time <= time)
+                {
+                    var input = _scriptedInputs[_scriptedInputIndex++];
+
+                    BaseEngine.QueueInput(ref input);
+                    OnInputQueued(input);
+                    _replayInputs.Add(input);
+
+                    if (MultiplayerGameplay.IsInMatch)
+                    {
+                        MultiplayerGameplay.OnLocalInput(this, input);
+                    }
+                }
+            }
+
             BaseEngine.Update(time);
 
             if (MultiplayerGameplay.IsInMatch && !Player.IsReplay)
             {
                 MultiplayerGameplay.OnLocalEngineTime(this, time);
             }
+        }
+
+        /// <summary>
+        /// Drives this local player with a list of inputs (in engine time, sorted) instead of a device.
+        /// </summary>
+        public void SetScriptedInputs(List<GameInput> inputs)
+        {
+            _scriptedInputs = inputs;
+            _scriptedInputIndex = 0;
         }
 
         private void UpdateRemoteInputs(double time)

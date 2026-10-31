@@ -342,6 +342,8 @@ namespace YARG.Gameplay.Player
 
         protected List<TNote> Notes { get; set; }
 
+        public IReadOnlyList<TNote> ChartNotes => Notes;
+
         protected int NoteIndex { get; private set; }
 
         public InstrumentDifficulty<TNote> NoteTrack { get; private set; }
