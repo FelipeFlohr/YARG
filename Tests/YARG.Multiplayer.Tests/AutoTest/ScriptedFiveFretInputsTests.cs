@@ -23,6 +23,7 @@ namespace YARG.Multiplayer.Tests.AutoTest
             public List<GuitarNote> Notes = null!;
             public List<GameInput>  Inputs = null!;
             public List<double>     HitTimes = new();
+            public List<double>     DroppedSustains = new();
         }
 
         private static Run Play(double missFrom, double missTo, double notBefore = double.NegativeInfinity)
@@ -38,6 +39,13 @@ namespace YARG.Multiplayer.Tests.AutoTest
                 Inputs = ScriptedFiveFretInputs.Generate(track.Notes, missFrom, missTo, notBefore),
             };
             engine.OnNoteHit += (_, note) => run.HitTimes.Add(note.Time);
+            engine.OnSustainEnd += (_, time, finished) =>
+            {
+                if (!finished)
+                {
+                    run.DroppedSustains.Add(time);
+                }
+            };
 
             double end = track.GetEndTime();
             int next = 0;
@@ -63,6 +71,31 @@ namespace YARG.Multiplayer.Tests.AutoTest
 
             Assert.That(outside, Is.GreaterThan(0));
             Assert.That((double) hitsOutside / outside, Is.GreaterThanOrEqualTo(0.99));
+        }
+
+        [Test]
+        public void Generate_KeepsHoldingSustainsBeforeTheWindow()
+        {
+            var run = Play(30, 40);
+
+            Assert.That(run.DroppedSustains.Where(t => t < 30), Is.Empty);
+        }
+
+        [Test]
+        public void Generate_KeepsTheSustainedFretPressedWhileAHigherNoteIsPlayed()
+        {
+            var notes = new List<GuitarNote>
+            {
+                new(FiveFretGuitarFret.Green, GuitarNoteType.Strum, GuitarNoteFlags.None, NoteFlags.None, 1.0, 0.7, 100, 70),
+                new(FiveFretGuitarFret.Red, GuitarNoteType.Strum, GuitarNoteFlags.None, NoteFlags.None, 1.3, 0, 130, 0),
+                new(FiveFretGuitarFret.Yellow, GuitarNoteType.Strum, GuitarNoteFlags.None, NoteFlags.None, 2.0, 0, 200, 0),
+            };
+
+            var inputs = ScriptedFiveFretInputs.Generate(notes, 50, 60);
+
+            var greenReleases = inputs.Where(i => i.Action == (int) GuitarAction.Fret1 && !i.Button).ToList();
+            Assert.That(greenReleases, Has.Count.EqualTo(1));
+            Assert.That(greenReleases[0].Time, Is.GreaterThanOrEqualTo(1.7));
         }
 
         [Test]

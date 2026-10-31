@@ -29,6 +29,8 @@ namespace YARG.Multiplayer.AutoTest
             int held = 0;
             double lastFretTime = double.NegativeInfinity;
             bool leftWindowEntry = false;
+            int sustainMask = 0;
+            double sustainEnd = double.NegativeInfinity;
 
             foreach (var note in notes)
             {
@@ -43,6 +45,7 @@ namespace YARG.Multiplayer.AutoTest
                         held = 0;
                         lastFretTime = releaseTime;
                     }
+                    sustainMask = 0;
                 }
 
                 if (note.Time >= missFrom && note.Time <= missTo)
@@ -57,6 +60,19 @@ namespace YARG.Multiplayer.AutoTest
                 }
 
                 int mask = note.NoteMask & ((1 << FretBits) - 1);
+                if (mask != 0 && sustainMask != 0 && note.Time < sustainEnd && HighestBit(sustainMask) < LowestBit(mask))
+                {
+                    // Extended sustain: a player keeps the sustained (lower) fret down while playing higher notes,
+                    // letting go of it would drop the sustain and mute the instrument.
+                    mask |= sustainMask;
+                    sustainMask = mask;
+                    sustainEnd = System.Math.Max(sustainEnd, note.TimeEnd);
+                }
+                else
+                {
+                    sustainMask = note.IsSustain ? mask : 0;
+                    sustainEnd = note.TimeEnd;
+                }
                 SetFrets(inputs, fretTime, held, mask);
                 held = mask;
                 lastFretTime = fretTime;
@@ -83,6 +99,26 @@ namespace YARG.Multiplayer.AutoTest
                 sorted.Add(item.Input);
             }
             return sorted;
+        }
+
+        private static int LowestBit(int mask)
+        {
+            int bit = 0;
+            while ((mask & (1 << bit)) == 0)
+            {
+                bit++;
+            }
+            return bit;
+        }
+
+        private static int HighestBit(int mask)
+        {
+            int bit = FretBits - 1;
+            while ((mask & (1 << bit)) == 0)
+            {
+                bit--;
+            }
+            return bit;
         }
 
         private static void SetFrets(List<GameInput> inputs, double time, int from, int to)
