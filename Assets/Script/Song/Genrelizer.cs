@@ -7,6 +7,7 @@ using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using UnityEngine.Networking;
+using YARG.Core.IO;
 using YARG.Core.Logging;
 using YARG.Core.Song;
 using YARG.Helpers;
@@ -161,6 +162,40 @@ namespace YARG.Song
             };
         }
 
+        public static BaseGenre GetBaseGenre(SortString genre)
+        {
+            var overGenre = Overgenrelize(genre);
+            return OVERGENRE_TO_BASE_GENRE.GetValueOrDefault(overGenre, BaseGenre.Other);
+        }
+
+        public static BaseGenre[] GetAnimationGenres(MiloAnimation.MiloAnimationGenre genre)
+        {
+            return genre switch
+            {
+                MiloAnimation.MiloAnimationGenre.Spazz => new[]
+                {
+                    BaseGenre.Punk,
+                },
+                MiloAnimation.MiloAnimationGenre.Dramatic => new[]
+                {
+                    BaseGenre.DanceElectronic,
+                    BaseGenre.Pop,
+                },
+                MiloAnimation.MiloAnimationGenre.Banger => new[]
+                {
+                    BaseGenre.Metal
+                },
+                MiloAnimation.MiloAnimationGenre.Rocker => new[]
+                {
+                    BaseGenre.Rock,
+                    BaseGenre.HipHop,
+                    BaseGenre.Other
+                },
+                MiloAnimation.MiloAnimationGenre.None => Array.Empty<BaseGenre>(),
+                _                                     => throw new ArgumentOutOfRangeException(nameof(genre), genre, null)
+            };
+        }
+
         private static string _getLocalizedGenre(string genre)
         {
             var res = Localization.Localize.Key("Menu.MusicLibrary.Genre", GENRE_LOCALIZATION_KEYS.GetValueOrDefault(genre));
@@ -185,14 +220,13 @@ namespace YARG.Song
         public static readonly string GenresFolder = Path.Combine(PathHelper.StreamingAssetsPath, "genres");
 #endif
 
-        public static async UniTask LoadGenreMappings(LoadingContext context)
+        public static async UniTask LoadGenreMappings()
         {
             if (!GlobalVariables.OfflineMode)
             {
-                await _downloadGenreMappings(context);
+                await _downloadGenreMappings();
             }
 
-            context.SetSubText("Loading genre mappings...");
             _readGenreMappings();
         }
 
@@ -319,14 +353,11 @@ namespace YARG.Song
 
 
 
-        private static async UniTask _downloadGenreMappings(LoadingContext context)
+        private static async UniTask _downloadGenreMappings()
         {
-            context.SetLoadingText("Downloading genre mappings...");
-
             // Create the sources folder if it doesn't exist
             Directory.CreateDirectory(GenresFolder);
 
-            context.SetSubText("Checking version...");
             string genreVersionPath = Path.Combine(GenresFolder, "version.txt");
             string currentVersion = null;
             try
@@ -342,7 +373,6 @@ namespace YARG.Song
             }
 
             // Look for new version
-            context.SetSubText("Looking for new version...");
             string newestVersion = null;
             try
             {
@@ -384,7 +414,6 @@ namespace YARG.Song
             try
             {
                 // Download
-                context.SetSubText("Downloading new version...");
                 string zipPath = Path.Combine(GenresFolder, "update.zip");
                 using (var request = new UnityWebRequest(GENRE_ZIP_URL, UnityWebRequest.kHttpVerbGET))
                 {
@@ -404,7 +433,6 @@ namespace YARG.Song
                 }
 
                 // Extract the base and extras folder
-                context.SetSubText("Extracting new version...");
                 ZipFile.ExtractToDirectory(zipPath, GenresFolder);
 
                 // Delete the random folders

@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using YARG.Core;
 using YARG.Core.Game;
+using YARG.Core.Song;
 using YARG.Localization;
 using YARG.Menu.Data;
 using YARG.Menu.Dialogs;
@@ -44,6 +45,10 @@ namespace YARG.Menu.Persistent
         private FriendlyBindingDialog _friendlyMidiDrumsBindingDialog;
         [SerializeField]
         private SongPickerListDialog _playAShowDialog;
+        [SerializeField]
+        private LibrarySearchDialog _librarySearchDialog;
+        [SerializeField]
+        private ImageDialog _imageDialog;
 
         private Dialog _currentDialog;
 
@@ -212,17 +217,21 @@ namespace YARG.Menu.Persistent
         /// Displays and returns a confirm delete dialog.
         /// </summary>
         /// <inheritdoc cref="ShowDialog{ListDialog}(ListDialog)"/>
-        public ColorPickerDialog ShowColorPickerDialog(Color initialColor, Action<Color> colorPickAction)
+        public ColorPickerDialog ShowColorPickerDialog(Color initialColor, Action<Color> colorPickAction,
+            bool allowTransparency = false)
         {
             var dialog = ShowDialog(_colorPickerDialog);
 
             dialog.Title.text = Localize.Key("Menu.Dialog.ColorPicker.Title");
-            dialog.Initialize(initialColor);
+            dialog.Initialize(initialColor, allowTransparency);
             dialog.ColorPickAction = colorPickAction;
 
             dialog.ClearButtons();
             dialog.AddDialogButton("Menu.Common.Cancel", MenuData.Colors.CancelButton, ClearDialog);
             dialog.AddDialogButton("Menu.Common.Apply", MenuData.Colors.ConfirmButton, () => _currentDialog.Submit());
+
+            // After the buttons exist so they can be placed last in nav order
+            dialog.InitializeNavigation();
 
             return dialog;
         }
@@ -231,6 +240,32 @@ namespace YARG.Menu.Persistent
         {
             var dialog = ShowDialog(_playAShowDialog);
             dialog.Initialize(menu);
+
+            return dialog;
+        }
+
+        public LibrarySearchDialog ShowLibrarySearchDialog(string title, Action<SongEntry> selectAction)
+        {
+            var dialog = ShowDialog(_librarySearchDialog);
+            dialog.Title.text = title;
+            dialog.SelectAction = selectAction;
+
+            dialog.ClearButtons();
+            dialog.AddDialogButton("Menu.Common.Cancel", MenuData.Colors.CancelButton, ClearDialog);
+            dialog.AddDialogButton("Menu.Common.Apply", MenuData.Colors.ConfirmButton, () => _currentDialog.Submit());
+
+            return dialog;
+        }
+
+        public ImageDialog ShowImageDialog(string title, string message, string path)
+        {
+            var dialog = ShowDialog(_imageDialog);
+            dialog.Title.text = title;
+            dialog.Message.text = message;
+            dialog.SetImage(path);
+
+            dialog.ClearButtons();
+            dialog.AddDialogButton("Menu.Common.Close", MenuData.Colors.ConfirmButton, ClearDialog);
 
             return dialog;
         }

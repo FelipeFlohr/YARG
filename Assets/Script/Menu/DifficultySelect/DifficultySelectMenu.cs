@@ -13,11 +13,14 @@ using YARG.Core.Game;
 using YARG.Core.Input;
 using YARG.Core.Song;
 using YARG.Core.Utility;
+using YARG.Helpers;
 using YARG.Helpers.Extensions;
 using YARG.Localization;
+using YARG.Menu.Data;
 using YARG.Menu.Navigation;
 using YARG.Menu.Persistent;
 using YARG.Menu.Filters;
+using YARG.Menu.MusicLibrary;
 using YARG.Multiplayer;
 using YARG.Player;
 using YARG.Song;
@@ -36,9 +39,49 @@ namespace YARG.Menu.DifficultySelect
             Main,
             Instrument,
             Difficulty,
+            Adjustments,
             Modifiers,
+            OpenLane,
+            Accessibility,
             Harmony
         }
+
+        // Modifiers relocated from the Modifiers menu to the Accessibility menu.
+        // RangeCompress is folded into the "No Range Shifts" toggle there.
+        private const Modifier ACCESSIBILITY_MODIFIERS =
+            Modifier.OpensToGreens | Modifier.NoKicks | Modifier.UnpitchedOnly | Modifier.RangeCompress;
+
+        // Backdrop circle marking the selected instrument's ring — translucent
+        // black (a blue tint blended into the row's blue selection highlight).
+        private static readonly Color SELECTED_INSTRUMENT_COLOR = new Color(0f, 0f, 0f, 0.5f);
+
+        // Non-selected ring arcs and instrument icons dim while the instrument
+        // field is focused (blue row highlight, backdrop visible) and further
+        // when another field has focus (black row, where the backdrop is
+        // invisible). The intensity number is deliberately left undimmed.
+        private const float RING_DIM_FOCUSSED = 0.6f;
+        private const float RING_DIM_UNFOCUSSED = 0.2f;
+        private const float ICON_DIM_FOCUSSED = 0.45f;
+        private const float ICON_DIM_UNFOCUSSED = 0.3f;
+
+        // Done buttons: the ready/sit-out treatment in blue — blue text on the
+        // normal row, and while selected a solid blue fill of the whole row
+        // behind near-black text.
+        private static          Color DONE_TEXT_COLOR => new Color32(0x00, 0xD3, 0xFF, 0xFF);
+        private static readonly Color DONE_SELECTED_TEXT_COLOR = new Color32(0x01, 0x22, 0x27, 0xFF);
+        private static readonly Color DONE_SELECTED_FILL_COLOR = new Color32(0x00, 0xD3, 0xFF, 0xFF);
+
+        // Instruments that use the (X-Fret) suffix and not the (X-Lane) suffix when in 6-fret mode
+        private static readonly Instrument[] _fretInstruments = {
+            Instrument.FiveFretGuitar,
+            Instrument.FiveFretBass,
+            Instrument.FiveFretCoopGuitar,
+            Instrument.FiveFretRhythm,
+            Instrument.SixFretGuitar,
+            Instrument.SixFretBass,
+            Instrument.SixFretRhythm,
+            Instrument.SixFretCoopGuitar,
+        };
 
         [SerializeField]
         private TextMeshProUGUI _subHeader;
@@ -48,6 +91,8 @@ namespace YARG.Menu.DifficultySelect
         private NavigationGroup _navGroup;
         [SerializeField]
         private TextMeshProUGUI _text;
+        [SerializeField]
+        private DifficultyRing _difficultyRing;
         [SerializeField]
         private TMP_InputField _speedInput;
         [SerializeField]
@@ -75,6 +120,10 @@ namespace YARG.Menu.DifficultySelect
         [SerializeField]
         private DifficultyItem _difficultyItemSmallRedPrefab;
         [SerializeField]
+        private GameObject _coloredItemPrefab;
+        [SerializeField]
+        private GameObject _ringsItemPrefab;
+        [SerializeField]
         private ModifierItem _modifierItemPrefab;
 
         private int _playerIndex;
@@ -93,11 +142,13 @@ namespace YARG.Menu.DifficultySelect
         private int _maxHarmonyIndex = 3;
 
         private readonly List<ModifierItem> _modifierItems = new();
+        private readonly List<Modifier> _itemModifiers = new();
 
         private List<SongEntry> _songList;
 
         private YargPlayer CurrentPlayer => PlayerContainer.Players[_playerIndex];
 
+        private ScrollRect _scrollRect;
         private Scrollbar _scrollbar;
 
         private void OnEnable()
@@ -106,7 +157,7 @@ namespace YARG.Menu.DifficultySelect
             _subHeader.text = Localize.Key("Menu.Main.Options", subHeaderKey);
 
             // Set navigation scheme
-            Navigator.Instance.PushScheme(new NavigationScheme(new()
+            _ = Navigator.Instance.PushScheme(new NavigationScheme(new()
             {
                 NavigationScheme.Entry.NavigateUp,
                 NavigationScheme.Entry.NavigateDown,
@@ -126,7 +177,14 @@ namespace YARG.Menu.DifficultySelect
                     }
                     else
                     {
-                        _menuState = State.Main;
+                        // Nested menus back out one level at a time:
+                        // OpenLane -> Modifiers -> Adjustments -> Main.
+                        _menuState = _menuState switch
+                        {
+                            State.OpenLane => State.Modifiers,
+                            State.Modifiers or State.Accessibility => State.Adjustments,
+                            _ => State.Main,
+                        };
                         UpdateForPlayer();
                     }
                 })
@@ -145,6 +203,14 @@ namespace YARG.Menu.DifficultySelect
                 _songList = new List<SongEntry> { GlobalVariables.State.CurrentSong };
             }
 
+            // Starting a fresh selection session: discard any session-scoped modifiers
+            // imposed by a previous song (see ApplySessionModifiers) so each player's
+            // own saved selection is what shows and is edited here.
+            foreach (var player in PlayerContainer.Players)
+            {
+                player.Profile.RestoreSavedModifiers();
+            }
+
             // ChangePlayer(0) will update for the current player
             _playerIndex = 0;
             _vocalModifierSelectIndex = -1;
@@ -156,7 +222,14 @@ namespace YARG.Menu.DifficultySelect
             _sourceIcon.sprite = SongSources.SourceToIcon(GlobalVariables.State.CurrentSong.Source);
             _sourceIcon.gameObject.SetActive(_sourceIcon.sprite != null);
 
+            // The header ring is only a template for the per-row rings now (the
+            // header shows just the game-mode sprite and name); keep it inactive.
+            if (_difficultyRing != null)
+            {
+                _difficultyRing.gameObject.SetActive(false);
+            }
 
+            _scrollRect = GetComponentInChildren<ScrollRect>();
             _scrollbar = GetComponentInChildren<Scrollbar>();
             _navGroup.SelectionChanged += UpdateForSelectionChanged;
         }
@@ -164,27 +237,42 @@ namespace YARG.Menu.DifficultySelect
         private void UpdateForSelectionChanged(NavigatableBehaviour navigatableBehaviour,
             SelectionOrigin selectionOrigin)
         {
+            UpdateScrollbarForSelection();
+        }
+
+        private void UpdateScrollbarForSelection()
+        {
             if (!_scrollbar)
             {
                 return;
             }
 
             int? index = _navGroup.SelectedIndex;
-            if (index is { } i)
+            if (index is not { } i) return;
+
+            int count = _navGroup.Count;
+            if (count <= 0)
             {
-                int count = _navGroup.Count;
-                float highScrollBound = _scrollbar.size + (1 - _scrollbar.size) * _scrollbar.value;
-                float lowScrollBound = (1 - _scrollbar.size) * _scrollbar.value;
-                float indexHighBound = 1 - (1 / (float) count) * i;
-                float indexLowBound = 1 - (1 / (float) count) * (i + 1);
-                if (highScrollBound < indexHighBound)
-                {
-                    _scrollbar.value = (indexHighBound - _scrollbar.size) / (1 - _scrollbar.size);
-                }
-                else if (lowScrollBound > indexLowBound)
-                {
-                    _scrollbar.value = indexLowBound / (1 - _scrollbar.size);
-                }
+                return;
+            }
+
+            if (Mathf.Approximately(_scrollbar.size, 1f))
+            {
+                _scrollbar.value = 1f;
+                return;
+            }
+
+            float highScrollBound = _scrollbar.size + (1 - _scrollbar.size) * _scrollbar.value;
+            float lowScrollBound = (1 - _scrollbar.size) * _scrollbar.value;
+            float indexHighBound = 1 - (1 / (float) count) * i;
+            float indexLowBound = 1 - (1 / (float) count) * (i + 1);
+            if (highScrollBound < indexHighBound)
+            {
+                _scrollbar.value = (indexHighBound - _scrollbar.size) / (1 - _scrollbar.size);
+            }
+            else if (lowScrollBound > indexLowBound)
+            {
+                _scrollbar.value = indexLowBound / (1 - _scrollbar.size);
             }
         }
 
@@ -211,8 +299,17 @@ namespace YARG.Menu.DifficultySelect
                 case State.Difficulty:
                     CreateDifficultyMenu();
                     break;
+                case State.Adjustments:
+                    CreateAdjustmentsMenu();
+                    break;
                 case State.Modifiers:
                     CreateModifierMenu();
+                    break;
+                case State.OpenLane:
+                    CreateOpenLaneMenu();
+                    break;
+                case State.Accessibility:
+                    CreateAccessibilityMenu();
                     break;
                 case State.Harmony:
                     CreateHarmonyMenu();
@@ -220,6 +317,61 @@ namespace YARG.Menu.DifficultySelect
             }
 
             _lastMenuState = _menuState;
+            RefreshScrollbar();
+        }
+
+        // Get the charter-rated tier values for an instrument. Harmony and party
+        // vocals read from HarmonyVocals, which is empty on solo-only songs (no
+        // harmony chart) — fall back to the lead vocals tier so the ring still
+        // shows meaningful data instead of the dimmed state.
+        private static PartValues GetTierValues(SongEntry song, Instrument instrument)
+        {
+            var tierValues = song[instrument];
+
+            if (instrument is Instrument.Harmony or Instrument.PartyVocals && !tierValues.IsActive())
+            {
+                tierValues = song[Instrument.Vocals];
+            }
+
+            return tierValues;
+        }
+
+        // Resolve the bare Addressable icon name for the ring. Handles the 22-fret
+        // pro-instrument gap (ToResourceName returns null for ProGuitar_22Fret /
+        // ProBass_22Fret) and selects the part-count mic icon for harmony and
+        // party vocals based on the song's vocal part count.
+        private static string GetInstrumentRingAsset(Instrument instrument, int vocalPartCount)
+            => instrument switch
+        {
+            Instrument.ProGuitar_22Fret => "realGuitar",
+            Instrument.ProBass_22Fret   => "realBass",
+            Instrument.Harmony or Instrument.PartyVocals => vocalPartCount switch
+            {
+                >= 3 => "harmVocals",
+                2    => "twoVocals",
+                _    => "vocals",
+            },
+            _ => instrument.ToResourceName(),
+        };
+
+        private void RefreshScrollbar()
+        {
+            if (_scrollRect == null)
+            {
+                UpdateScrollbarForSelection();
+                return;
+            }
+
+            Canvas.ForceUpdateCanvases();
+            _scrollRect.Rebuild(CanvasUpdate.PostLayout);
+
+            if (_scrollRect.ScrollableHeight() <= 0f)
+            {
+                _scrollRect.verticalNormalizedPosition = 1f;
+                return;
+            }
+
+            UpdateScrollbarForSelection();
         }
 
         private void CreateMainMenu()
@@ -255,13 +407,69 @@ namespace YARG.Menu.DifficultySelect
                     ChangePlayer(1);
                 });
 
-                CreateItem(LocalizeHeader("Instrument"),
-                    player.Profile.CurrentInstrument.ToLocalizedName(),
-                    _lastMenuState == State.Instrument, () =>
+                var instrumentItem = CreateItem(LocalizeHeader("Instrument"),
+                    GetInstrumentDisplayName(player.Profile.CurrentInstrument, player.Profile.GameMode),
+                    _lastMenuState == State.Instrument, _ringsItemPrefab, () =>
                 {
                     _menuState = State.Instrument;
                     UpdateForPlayer();
                 });
+
+                // Show every available instrument's tier wheel on its own row
+                // within the item (localized instrument names can be long, so a
+                // ring column beside the text doesn't reliably fit). The selected
+                // instrument gets a backdrop circle behind its ring; the rest
+                // are dimmed, deeper while another field has focus (the black
+                // unfocused row hides the circle and shrinks the dim contrast).
+                if (_difficultyRing != null && _possibleInstruments.Count > 0)
+                {
+                    const float ringSize = 40f;
+
+                    var song = GlobalVariables.State.CurrentSong;
+                    var rings = instrumentItem.GetComponent<DifficultyItemRings>()
+                        .AttachRingRow(_difficultyRing, _possibleInstruments.Count, ringSize);
+
+                    var currentInstrument = player.Profile.CurrentInstrument;
+                    DifficultyRing selectedRing = null;
+
+                    for (int i = 0; i < _possibleInstruments.Count; i++)
+                    {
+                        var instrument = _possibleInstruments[i];
+                        rings[i].SetInfo(
+                            GetInstrumentRingAsset(instrument, song.VocalsCount),
+                            instrument,
+                            GetTierValues(song, instrument));
+
+                        if (instrument == currentInstrument)
+                        {
+                            // Extra size is in the ring's native units; scale it
+                            // so the circle extends four *screen* pixels per
+                            // side, giving the ring a prominent rim.
+                            rings[i].ShowSelectionBackdrop(SELECTED_INSTRUMENT_COLOR,
+                                extraSize: 8f * 65f / ringSize);
+                            selectedRing = rings[i];
+                        }
+                    }
+
+                    void ApplyInstrumentFieldFocus(bool focused)
+                    {
+                        selectedRing?.SetBackdropVisible(focused);
+                        for (int i = 0; i < rings.Length; i++)
+                        {
+                            if (rings[i] != selectedRing)
+                            {
+                                rings[i].SetRingOpacity(
+                                    focused ? RING_DIM_FOCUSSED : RING_DIM_UNFOCUSSED);
+                                rings[i].SetIconColor(Color.white.WithAlpha(
+                                    focused ? ICON_DIM_FOCUSSED : ICON_DIM_UNFOCUSSED));
+                            }
+                        }
+                    }
+
+                    instrumentItem.Button.SelectionStateChanged += (_, selected, _) =>
+                        ApplyInstrumentFieldFocus(selected);
+                    ApplyInstrumentFieldFocus(instrumentItem.Button.Selected);
+                }
 
                 CreateItem(LocalizeHeader("Difficulty"),
                     player.Profile.CurrentDifficulty.ToLocalizedName(),
@@ -288,32 +496,21 @@ namespace YARG.Menu.DifficultySelect
                     _vocalModifierSelectIndex == -1 ||
                     _vocalModifierSelectIndex == _playerIndex)
                 {
-                    // Create modifiers body text
-                    string modifierText = "";
-                    if ((player.Profile.CurrentModifiers & ~_excusableModifiers) == Modifier.None)
+                    var adjustmentsItem = CreateItem(LocalizeHeader("Adjustments"),
+                        BuildAdjustmentsSummary(player.Profile, out int optionCount),
+                        _lastMenuState is State.Adjustments or State.Modifiers or State.Accessibility, () =>
                     {
-                        // If there are no modifiers (ignoring the excusable ones), then just say "none"
-                        modifierText = Modifier.None.ToLocalizedName();
-                    }
-                    else
-                    {
-                        // Combine all modifiers
-                        foreach (var modifier in _possibleModifiers)
-                        {
-                            if (!player.Profile.IsModifierActive(modifier)) continue;
-
-                            modifierText += modifier.ToLocalizedName() + "\n";
-                        }
-
-                        modifierText = modifierText.Trim();
-                    }
-
-                    CreateItem(LocalizeHeader("Modifiers"),
-                        modifierText, _lastMenuState == State.Modifiers, () =>
-                    {
-                        _menuState = State.Modifiers;
+                        _menuState = State.Adjustments;
                         UpdateForPlayer();
                     });
+
+                    // With a single active option (or none) the summary fits at
+                    // the normal body size; longer lists drop to the header size
+                    // to keep the row compact.
+                    if (optionCount >= 2)
+                    {
+                        adjustmentsItem.UseSmallBodyText();
+                    }
                 }
             }
 
@@ -366,15 +563,50 @@ namespace YARG.Menu.DifficultySelect
             }
         }
 
+        // "5 - Nightmare"-style tier text for the instrument menu, using the
+        // filters menu's localized tier names. "No Part" can't come up here —
+        // the menu only lists playable instruments.
+        private static string GetTierLabel(PartValues values)
+        {
+            if (!values.IsActive() || values.Intensity < 0)
+            {
+                return "? - " + Localize.Key("Menu.Filters.Intensities.Unknown");
+            }
+
+            // The label clamps at the top tier; the number stays exact.
+            string text = $"{values.Intensity} - {IntensityLabels.GetLabelByIndex(values.Intensity)}";
+
+            // Top-tier colors (matching the web export's tier palette): orange
+            // at 5, the ring segments' red at 6+.
+            return values.Intensity switch
+            {
+                >= 6 => $"<color=#FB443F>{text}</color>",
+                5    => $"<color=#FF8400>{text}</color>",
+                _    => text,
+            };
+        }
+
         private void CreateInstrumentMenu()
         {
+            var song = GlobalVariables.State.CurrentSong;
+
             foreach (var instrument in _possibleInstruments)
             {
                 bool selected = CurrentPlayer.Profile.CurrentInstrument == instrument;
-                CreateItem(instrument.ToLocalizedName(), selected, () =>
+                // Instrument name with its charted tier on a smaller, dimmed
+                // second line (mirroring the header text style).
+                string label = GetInstrumentDisplayName(instrument, CurrentPlayer.Profile.GameMode)
+                    + $"\n<size=18><color=#FFFFFF80>{GetTierLabel(GetTierValues(song, instrument))}</color></size>";
+
+                CreateItem(label, selected, () =>
                 {
                     var preferredInstrument = CurrentPlayer.Profile.PreferredInstrument;
                     CurrentPlayer.Profile.CurrentInstrument = instrument;
+
+                    // Re-resolve after an instrument switch in case the raw harmony index is out
+                    // of range for this song (ChangePlayer's check can be masked by the
+                    // HarmonyIndex getter returning 0 when not on Harmony).
+                    CurrentPlayer.Profile.ResolveHarmonyIndex(_maxHarmonyIndex);
 
                     // What we are doing here is resetting preferred instrument only if the current preferred instrument
                     // was an option for this chart. This ensures that preferred instrument does not change when the
@@ -411,41 +643,324 @@ namespace YARG.Menu.DifficultySelect
             }
         }
 
+        // Intermediate menu grouping the Modifiers and Accessibility sub-menus,
+        // each previewing its active options in its body text.
+        private void CreateAdjustmentsMenu()
+        {
+            var profile = CurrentPlayer.Profile;
+
+            CreateItem(LocalizeHeader("Modifiers"),
+                BuildModifierSummary(profile),
+                _lastMenuState != State.Accessibility, () =>
+            {
+                _menuState = State.Modifiers;
+                UpdateForPlayer();
+            });
+
+            if (HasAccessibilityOptions(profile))
+            {
+                CreateItem(LocalizeHeader("Accessibility"),
+                    BuildAccessibilitySummary(profile),
+                    _lastMenuState == State.Accessibility, () =>
+                {
+                    _menuState = State.Accessibility;
+                    UpdateForPlayer();
+                });
+            }
+
+            // Create done button
+            CreateDoneItem(() =>
+            {
+                _menuState = State.Main;
+                UpdateForPlayer();
+            });
+        }
+
+        private void CreateDoneItem(UnityAction action)
+        {
+            var btn = Instantiate(_coloredItemPrefab, _container).GetComponent<DifficultyItem>();
+            btn.Initialize(LocalizeHeader("Done"), action);
+            btn.SetInteractable(true);
+            _navGroup.AddNavigatable(btn.Button);
+
+            var colorizer = btn.GetComponent<DifficultyItemColorizer>();
+            colorizer.SetButtonColor(DONE_TEXT_COLOR, DONE_SELECTED_TEXT_COLOR);
+            colorizer.SetSelectionFill(DONE_SELECTED_FILL_COLOR);
+        }
+
         private void CreateModifierMenu()
         {
             var profile = CurrentPlayer.Profile;
 
             _modifierItems.Clear();
+            _itemModifiers.Clear();
+
             foreach (var modifier in _possibleModifiers)
             {
-                var btn = Instantiate(_modifierItemPrefab, _container);
-                btn.Initialize(modifier.ToLocalizedName(), profile.IsModifierActive(modifier), active =>
-                {
-                    // Enable/disable the modifier
-                    if (active)
-                    {
-                        profile.AddSingleModifier(modifier);
-                    }
-                    else
-                    {
-                        profile.RemoveModifiers(modifier);
-                    }
+                // Accessibility-relocated modifiers live in the Accessibility menu
+                if ((modifier & ACCESSIBILITY_MODIFIERS) != 0) continue;
 
-                    UpdateModifierMenu();
-                });
-
-                _navGroup.AddNavigatable(btn);
-                _modifierItems.Add(btn);
+                AddModifierToggle(profile, modifier);
             }
 
-            // Create done button
-            CreateItem(LocalizeHeader("Done"), _difficultyGreenPrefab, () =>
+            // Five-lane keys: the three-state OpenLaneDisplayType gets its own
+            // sub-menu with the options laid out explicitly (a pair of dependent
+            // toggles read poorly, especially once localized).
+            if (profile.GameMode == GameMode.ProKeys)
             {
-                _menuState = State.Main;
+                CreateItem(LocalizeHeader("DedicatedOpenLane"),
+                    profile.OpenLaneDisplayType.ToLocalizedName(),
+                    _lastMenuState == State.OpenLane, () =>
+                {
+                    _menuState = State.OpenLane;
+                    UpdateForPlayer();
+                });
+            }
+
+            // Create done button (back to the Adjustments menu these nest under)
+            CreateDoneItem(() =>
+            {
+                _menuState = State.Adjustments;
                 UpdateForPlayer();
             });
 
             _navGroup.SelectFirst();
+        }
+
+        private static readonly OpenLaneDisplayType[] OPEN_LANE_OPTIONS =
+        {
+            OpenLaneDisplayType.Never,
+            OpenLaneDisplayType.Always,
+            OpenLaneDisplayType.IfChartContainsOpens,
+        };
+
+        private void CreateOpenLaneMenu()
+        {
+            var profile = CurrentPlayer.Profile;
+
+            // Title row (same string as the Modifiers-menu row that leads here)
+            // so the menu identifies itself; not part of the nav group.
+            Instantiate(_difficultyItemPrefab, _container)
+                .InitializeAsTitle(LocalizeHeader("DedicatedOpenLane"));
+
+            foreach (var displayType in OPEN_LANE_OPTIONS)
+            {
+                var capture = displayType;
+                bool selected = profile.OpenLaneDisplayType == displayType;
+                CreateItem(displayType.ToLocalizedName(), selected, () =>
+                {
+                    profile.OpenLaneDisplayType = capture;
+
+                    _menuState = State.Modifiers;
+                    UpdateForPlayer();
+                });
+            }
+        }
+
+        private void CreateAccessibilityMenu()
+        {
+            var profile = CurrentPlayer.Profile;
+
+            _modifierItems.Clear();
+            _itemModifiers.Clear();
+
+            if (SupportsLeftyFlip(profile.GameMode))
+            {
+                // Takes effect at track build time since this menu precedes gameplay.
+                AddProfileToggle(LocalizeHeader("LeftyFlip"), profile.LeftyFlip,
+                    on => profile.LeftyFlip = on);
+            }
+
+            if (SupportsRangeShifts(profile.GameMode))
+            {
+                // One positive "No Range Shifts" switch backed by both range
+                // mechanisms: the profile's RangeEnabled display setting (the
+                // profile editor's Range Disable toggle) and, where the game mode
+                // supports it, the RangeCompress chart modifier. Shown active if
+                // either says shifts are off, so it tracks the profile editor.
+                bool compressPossible = _possibleModifiers.Contains(Modifier.RangeCompress);
+                bool noRangeShifts = !profile.RangeEnabled
+                    || (compressPossible && profile.IsModifierActive(Modifier.RangeCompress));
+
+                AddProfileToggle(LocalizeHeader("NoRangeShifts"), noRangeShifts, on =>
+                {
+                    profile.RangeEnabled = !on;
+
+                    if (compressPossible)
+                    {
+                        if (on)
+                        {
+                            profile.AddSingleModifier(Modifier.RangeCompress);
+                        }
+                        else
+                        {
+                            profile.RemoveModifiers(Modifier.RangeCompress);
+                        }
+                    }
+                });
+            }
+
+            foreach (var modifier in _possibleModifiers)
+            {
+                if ((modifier & ACCESSIBILITY_MODIFIERS) == 0) continue;
+                if (modifier == Modifier.RangeCompress) continue; // folded in above
+
+                AddModifierToggle(profile, modifier);
+            }
+
+            // Create done button (back to the Adjustments menu these nest under)
+            CreateDoneItem(() =>
+            {
+                _menuState = State.Adjustments;
+                UpdateForPlayer();
+            });
+
+            _navGroup.SelectFirst();
+        }
+
+        // A ModifierItem toggle bound to arbitrary state (profile flags, display
+        // types) rather than a Modifier enum value.
+        private ModifierItem AddProfileToggle(string label, bool active, Action<bool> onChanged)
+        {
+            var btn = Instantiate(_modifierItemPrefab, _container);
+            btn.Initialize(label, active, onChanged);
+            _navGroup.AddNavigatable(btn);
+            return btn;
+        }
+
+        private void AddModifierToggle(YargProfile profile, Modifier modifier)
+        {
+            var btn = AddProfileToggle(modifier.ToLocalizedName(),
+                profile.IsModifierActive(modifier), active =>
+            {
+                // Enable/disable the modifier
+                if (active)
+                {
+                    profile.AddSingleModifier(modifier);
+                }
+                else
+                {
+                    profile.RemoveModifiers(modifier);
+                }
+
+                UpdateModifierMenu();
+            });
+
+            _modifierItems.Add(btn);
+            _itemModifiers.Add(modifier);
+        }
+
+        private static bool SupportsLeftyFlip(GameMode mode)
+            => mode is GameMode.FiveFretGuitar or GameMode.SixFretGuitar
+                or GameMode.FourLaneDrums or GameMode.FiveLaneDrums or GameMode.EliteDrums;
+
+        private static bool SupportsRangeShifts(GameMode mode)
+            => mode is GameMode.FiveFretGuitar or GameMode.ProKeys;
+
+        private bool HasAccessibilityOptions(YargProfile profile)
+            => SupportsLeftyFlip(profile.GameMode)
+                || SupportsRangeShifts(profile.GameMode)
+                || _possibleModifiers.Any(m => (m & ACCESSIBILITY_MODIFIERS) != 0);
+
+        // Summary body for the main menu's Adjustments row: the active options
+        // from both nested menus (Modifiers and Accessibility) combined.
+        // optionCount lets the caller pick a font size for the list.
+        private string BuildAdjustmentsSummary(YargProfile profile, out int optionCount)
+        {
+            string none = Modifier.None.ToLocalizedName();
+            string text = "";
+
+            string modifierSummary = BuildModifierSummary(profile);
+            if (modifierSummary != none)
+            {
+                text += modifierSummary + "\n";
+            }
+
+            if (HasAccessibilityOptions(profile))
+            {
+                string accessibilitySummary = BuildAccessibilitySummary(profile);
+                if (accessibilitySummary != none)
+                {
+                    text += accessibilitySummary + "\n";
+                }
+            }
+
+            text = text.Trim();
+
+            if (text.Length == 0)
+            {
+                optionCount = 0;
+                return none;
+            }
+
+            optionCount = text.Count(c => c == '\n') + 1;
+            return text;
+        }
+
+        // Summary body for the Adjustments menu's Modifiers row. Accessibility-relocated
+        // modifiers are summarized on their own row; the keys open-lane toggles
+        // live in the Modifiers menu but are backed by OpenLaneDisplayType rather
+        // than a Modifier flag, so they're listed here explicitly.
+        private string BuildModifierSummary(YargProfile profile)
+        {
+            string text = "";
+
+            if ((profile.CurrentModifiers & ~_excusableModifiers & ~ACCESSIBILITY_MODIFIERS) != Modifier.None)
+            {
+                foreach (var modifier in _possibleModifiers)
+                {
+                    if ((modifier & ACCESSIBILITY_MODIFIERS) != 0) continue;
+                    if (!profile.IsModifierActive(modifier)) continue;
+
+                    text += modifier.ToLocalizedName() + "\n";
+                }
+            }
+
+            // The bare display-type names wouldn't be meaningful in a summary;
+            // Never counts as "off" and isn't listed.
+            if (profile.GameMode == GameMode.ProKeys)
+            {
+                switch (profile.OpenLaneDisplayType)
+                {
+                    case OpenLaneDisplayType.Always:
+                        text += LocalizeHeader("OpenLaneAlways") + "\n";
+                        break;
+                    case OpenLaneDisplayType.IfChartContainsOpens:
+                        text += LocalizeHeader("OpenLaneWhenCharted") + "\n";
+                        break;
+                }
+            }
+
+            text = text.Trim();
+            return text.Length == 0 ? Modifier.None.ToLocalizedName() : text;
+        }
+
+        private string BuildAccessibilitySummary(YargProfile profile)
+        {
+            string text = "";
+
+            if (SupportsLeftyFlip(profile.GameMode) && profile.LeftyFlip)
+            {
+                text += LocalizeHeader("LeftyFlip") + "\n";
+            }
+
+            if (SupportsRangeShifts(profile.GameMode)
+                && (!profile.RangeEnabled || profile.IsModifierActive(Modifier.RangeCompress)))
+            {
+                text += LocalizeHeader("NoRangeShifts") + "\n";
+            }
+
+            foreach (var modifier in _possibleModifiers)
+            {
+                if ((modifier & ACCESSIBILITY_MODIFIERS) == 0) continue;
+                if (modifier == Modifier.RangeCompress) continue; // covered above
+                if (!profile.IsModifierActive(modifier)) continue;
+
+                text += modifier.ToLocalizedName() + "\n";
+            }
+
+            text = text.Trim();
+            return text.Length == 0 ? Modifier.None.ToLocalizedName() : text;
         }
 
         private void CreateHarmonyMenu()
@@ -471,7 +986,7 @@ namespace YARG.Menu.DifficultySelect
             for (int i = 0; i < _modifierItems.Count; i++)
             {
                 var item = _modifierItems[i];
-                var modifier = _possibleModifiers[i];
+                var modifier = _itemModifiers[i];
 
                 item.Active = profile.IsModifierActive(modifier);
             }
@@ -516,6 +1031,27 @@ namespace YARG.Menu.DifficultySelect
             _playerIndex += add;
             _menuState = State.Main;
 
+            if (GlobalVariables.State.CurrentCareer is not null)
+            {
+                // A career run never includes bots - a game played with them cannot commit career
+                // progress at all - so they are forced to sit out and never get a selection screen.
+                while (_playerIndex >= 0 && _playerIndex < PlayerContainer.Players.Count &&
+                       PlayerContainer.Players[_playerIndex].Profile.IsBot)
+                {
+                    PlayerContainer.Players[_playerIndex].SittingOut = true;
+                    _playerIndex += add >= 0 ? 1 : -1;
+                }
+
+                if (_playerIndex < 0)
+                {
+                    // Everything before the first playable player is a bot, so there is nowhere to
+                    // step back to; leaving the menu is the only way out, same as on the first player.
+                    _playerIndex = 0;
+                    MenuManager.Instance.PopMenu();
+                    return;
+                }
+            }
+
             // When the user(s) have selected all of their difficulties, move on
             if (_playerIndex >= PlayerContainer.Players.Count)
             {
@@ -536,7 +1072,8 @@ namespace YARG.Menu.DifficultySelect
                     // Call the player with the selected modifiers, the "primary player"
                     var primaryPlayer = PlayerContainer.Players[_vocalModifierSelectIndex];
 
-                    // Copy modifiers to all other vocal players
+                    // Apply the primary player's modifiers to the other vocal players
+                    // for this session only, so their own saved selections survive
                     foreach (var player in PlayerContainer.Players)
                     {
                         if (player.SittingOut) continue;
@@ -544,7 +1081,7 @@ namespace YARG.Menu.DifficultySelect
 
                         if (player.Profile.GameMode == GameMode.Vocals)
                         {
-                            player.Profile.CopyModifiers(primaryPlayer.Profile);
+                            player.Profile.ApplySessionModifiers(primaryPlayer.Profile);
                         }
                     }
                 }
@@ -615,11 +1152,14 @@ namespace YARG.Menu.DifficultySelect
                 _maxHarmonyIndex = Mathf.Min(_maxHarmonyIndex, showsong.VocalsCount);
             }
 
-            // Set the harmony index to a valid one
-            if (profile.HarmonyIndex >= _maxHarmonyIndex)
-            {
-                profile.HarmonyIndex = 0;
-            }
+            // Resolve the effective harmony index for this song from the player's last
+            // explicit selection (clamped to the available parts). Uses ResolveHarmonyIndex
+            // so the raw backing field is checked regardless of CurrentInstrument
+            // (HarmonyIndex getter returns 0 when not on Harmony, which would mask an
+            // out-of-range value from a direct comparison), and so a song with fewer
+            // parts doesn't permanently erase the selection — like DifficultyFallback
+            // preserves Expert+ across songs that lack it.
+            profile.ResolveHarmonyIndex(_maxHarmonyIndex);
 
             UpdatePossibleModifiers();
 
@@ -685,10 +1225,21 @@ namespace YARG.Menu.DifficultySelect
             Navigator.Instance.PopScheme();
         }
 
-        private void CreateItem(string header, string body, bool selected, DifficultyItem difficultyItem, UnityAction a)
+        private DifficultyItem CreateItem(string header, string body, bool selected, DifficultyItem difficultyItem, UnityAction a, bool interactable = true)
         {
             var btn = Instantiate(difficultyItem, _container);
+            return FinishCreateItem(btn, header, body, selected, a, interactable);
+        }
 
+        private DifficultyItem CreateItem(string header, string body, bool selected, GameObject itemPrefab, UnityAction a)
+        {
+            var btn = Instantiate(itemPrefab, _container).GetComponent<DifficultyItem>();
+            return FinishCreateItem(btn, header, body, selected, a);
+        }
+
+        private DifficultyItem FinishCreateItem(DifficultyItem btn, string header, string body,
+            bool selected, UnityAction a, bool interactable = true)
+        {
             if (header is null)
             {
                 btn.Initialize(body, a);
@@ -698,27 +1249,38 @@ namespace YARG.Menu.DifficultySelect
                 btn.Initialize(header, body, a);
             }
 
+            btn.SetInteractable(interactable);
+
+            // Non-interactable items (e.g. a forced single-chart choice) are shown dimmed and
+            // kept out of the nav group so they can't be focused or activated.
+            if (!interactable)
+            {
+                return btn;
+            }
+
             _navGroup.AddNavigatable(btn.Button);
 
             if (selected)
             {
                 _navGroup.SelectLast();
             }
+
+            return btn;
         }
 
-        private void CreateItem(string body, bool selected, DifficultyItem difficultyItem, UnityAction a)
+        private DifficultyItem CreateItem(string body, bool selected, DifficultyItem difficultyItem, UnityAction a)
         {
-            CreateItem(null, body, selected, difficultyItem, a);
+            return CreateItem(null, body, selected, difficultyItem, a);
         }
 
-        private void CreateItem(string header, string body, bool selected, UnityAction a)
+        private DifficultyItem CreateItem(string header, string body, bool selected, UnityAction a, bool interactable = true)
         {
-            CreateItem(header, body, selected, _difficultyItemPrefab, a);
+            return CreateItem(header, body, selected, _difficultyItemPrefab, a, interactable);
         }
 
-        private void CreateItem(string body, bool selected, UnityAction a)
+        private DifficultyItem CreateItem(string body, bool selected, UnityAction a)
         {
-            CreateItem(null, body, selected, a);
+            return CreateItem(null, body, selected, a);
         }
 
         private string LocalizeHeader(string key)
@@ -726,10 +1288,27 @@ namespace YARG.Menu.DifficultySelect
             return Localize.Key("Menu.DifficultySelect", key);
         }
 
+        private string GetInstrumentDisplayName(Instrument instrument, GameMode gameMode)
+        {
+            var name = instrument.ToLocalizedName();
+            // When in 6-fret mode, indicate when a 5-fret instrument is being used
+            // (i.e., a 5-fret chart loaded in 6-fret mode)
+            if (gameMode == GameMode.SixFretGuitar && !instrument.IsSixFret())
+            {
+                //TODO: Figure out a way to localise this
+                if (_fretInstruments.Contains(instrument))
+                {
+                    return $"{name} (5-Fret)";
+                }
+                return $"{name} (5-Lane)";
+            }
+            return name;
+        }
+
         private bool HasPlayableInstrument(SongEntry entry, in Instrument instrument)
         {
-            // For vocals, all players *must* select the same gamemode (solo/harmony)
-            if (instrument is Instrument.Vocals or Instrument.Harmony)
+            // For vocals, all players *must* select the same gamemode (solo/harmony/party)
+            if (instrument is Instrument.Vocals or Instrument.Harmony or Instrument.PartyVocals)
             {
                 if (!entry.HasInstrument(instrument))
                 {
@@ -737,12 +1316,14 @@ namespace YARG.Menu.DifficultySelect
                 }
 
                 // Loop through all of the players up to the current one
-                // to see what has already been selected.
+                // to see what has already been selected. Skip sitting-out players —
+                // their CurrentInstrument shouldn't lock later players into a vocals mode.
                 for (int i = 0; i < _playerIndex; i++)
                 {
                     var player = PlayerContainer.Players[i];
+                    if (player.SittingOut) continue;
                     var playerInstrument = player.Profile.CurrentInstrument;
-                    if (playerInstrument is Instrument.Vocals or Instrument.Harmony)
+                    if (playerInstrument is Instrument.Vocals or Instrument.Harmony or Instrument.PartyVocals)
                     {
                         return playerInstrument == instrument;
                     }
@@ -763,7 +1344,7 @@ namespace YARG.Menu.DifficultySelect
         private bool HasPlayableDifficulty(SongEntry entry, in Instrument instrument, in Difficulty difficulty)
         {
             // For vocals, insert special difficulties
-            if (instrument is Instrument.Vocals or Instrument.Harmony)
+            if (instrument is Instrument.Vocals or Instrument.Harmony or Instrument.PartyVocals)
             {
                 return difficulty is not Difficulty.ExpertPlus;
             }

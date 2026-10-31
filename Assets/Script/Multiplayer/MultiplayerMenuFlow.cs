@@ -5,6 +5,7 @@ using YARG.Core;
 using YARG.Core.Extensions;
 using YARG.Core.Song;
 using YARG.Localization;
+using YARG.Menu;
 using YARG.Menu.Dialogs;
 using YARG.Menu.MusicLibrary;
 using YARG.Menu.Navigation;

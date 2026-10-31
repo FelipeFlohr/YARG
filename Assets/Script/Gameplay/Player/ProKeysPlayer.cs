@@ -1,4 +1,4 @@
-﻿using DG.Tweening;
+using DG.Tweening;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -112,16 +112,8 @@ namespace YARG.Gameplay.Player
                 ProKeysUtilities.LOW_A => (ProKeysUtilities.LOW_G_SHARP, ProKeysUtilities.HIGH_C),
                 _ => throw new ArgumentOutOfRangeException("Unexpected Pro Keys range")
             };
-
-    private Tween _leftOutOfRangeTween => DOTween.Sequence(_leftOutOfRangeFlasher.material)
-            .Append(_leftOutOfRangeFlasher.material.DOFade(1.0f, 0.05f))
-            .Append(_leftOutOfRangeFlasher.material.DOFade(0.0f, 0.6f))
-            .SetAutoKill(false).Pause().SetEase(Ease.Linear);
-
-        private Tween _rightOutOfRangeTween => DOTween.Sequence(_rightOutOfRangeFlasher.material)
-            .Append(_rightOutOfRangeFlasher.material.DOFade(1.0f, 0.05f))
-            .Append(_rightOutOfRangeFlasher.material.DOFade(0.0f, 0.6f))
-            .SetAutoKill(false).Pause().SetEase(Ease.Linear);
+        private Tween _leftOutOfRangeTween;
+        private Tween _rightOutOfRangeTween;
 
         protected override InstrumentDifficulty<ProKeysNote> GetNotes(SongChart chart)
         {
@@ -149,7 +141,7 @@ namespace YARG.Gameplay.Player
             }
 
             var engine = new YargProKeysEngine(NoteTrack, SyncTrack, EngineParams, Player.Profile.IsBot);
-            EngineContainer = GameManager.EngineManager.Register(engine, NoteTrack.Instrument, Chart, Player.RockMeterPreset);
+            EngineContainer = GameManager.EngineManager.Register(engine, NoteTrack, Chart, Player.RockMeterPreset);
 
             HitWindow = EngineParams.HitWindow;
 
@@ -176,6 +168,9 @@ namespace YARG.Gameplay.Player
 
             engine.OnCountdownChange += OnCountdownChange;
 
+            EngineContainer.OnHappinessNearFail += OnHappinessNearFail;
+            EngineContainer.OnHappinessOverFail += OnHappinessOverFail;
+
             return engine;
         }
 
@@ -191,6 +186,16 @@ namespace YARG.Gameplay.Player
             _leftOutOfRangeFlasher.material.color = new Color(flasherColor.r, flasherColor.g, flasherColor.b, 0.0f);
             _rightOutOfRangeFlasher.material.color = new Color(flasherColor.r, flasherColor.g, flasherColor.b, 0.0f);
 
+            _leftOutOfRangeTween = DOTween.Sequence(_leftOutOfRangeFlasher.material)
+                .Append(_leftOutOfRangeFlasher.material.DOFade(1.0f, 0.05f))
+                .Append(_leftOutOfRangeFlasher.material.DOFade(0.0f, 0.6f))
+                .SetAutoKill(false).Pause().SetEase(Ease.Linear).SetLink(gameObject);
+
+            _rightOutOfRangeTween = DOTween.Sequence(_rightOutOfRangeFlasher.material)
+                .Append(_rightOutOfRangeFlasher.material.DOFade(1.0f, 0.05f))
+                .Append(_rightOutOfRangeFlasher.material.DOFade(0.0f, 0.6f))
+                .SetAutoKill(false).Pause().SetEase(Ease.Linear).SetLink(gameObject);
+
             if (_rangeShifts.Count > 0)
             {
                 RangeShiftTo(_rangeShifts[0], 0);
@@ -198,6 +203,28 @@ namespace YARG.Gameplay.Player
             }
 
             LaneElement.DefineLaneScale(Player.Profile.CurrentInstrument, WHITE_KEY_VISIBLE_COUNT);
+        }
+
+        protected override void ResetDifficulty(double time)
+        {
+            Engine.ReplaceChart(NoteTrack);
+            base.ResetDifficulty(time);
+
+            _rangeShiftIndex = 0;
+            _shiftIndicatorIndex = 0;
+
+            if (_rangeShifts.Count > 0)
+            {
+                while (_rangeShiftIndex < _rangeShifts.Count && _rangeShifts[_rangeShiftIndex].Time < time)
+                {
+                    _rangeShiftIndex++;
+                }
+
+                var shift = _rangeShifts[_rangeShiftIndex];
+
+                RangeShiftTo(shift, 0);
+                _rangeShiftIndex++;
+            }
         }
 
         public override void ResetPracticeSection()
@@ -306,12 +333,14 @@ namespace YARG.Gameplay.Player
 
         private void OnSustainStart(ProKeysNote parent)
         {
-
+            _keysArray.SetSustained(parent.Key, true);
         }
 
         private void OnSustainEnd(ProKeysNote parent, double timeEnded, bool finished)
         {
             (NotePool.GetByKey(parent) as ProKeysNoteElement)?.SustainEnd(finished);
+
+            _keysArray.SetSustained(parent.Key, false);
 
             // Mute the stem if you let go of the sustain too early.
             // Leniency is handled by the engine's sustain burst threshold.
@@ -522,7 +551,7 @@ namespace YARG.Gameplay.Player
             lane.OffsetXPosition(_currentOffset);
         }
 
-        protected override void InitializeSpawnedLane(LaneElement lane, int index)
+        protected override void InitializeBRELane(LaneElement lane, int index)
         {
             int noteIndex = index % 12;
             int octaveIndex = index / 12;
@@ -647,7 +676,7 @@ namespace YARG.Gameplay.Player
 
                 var laneParameters = _breLaneParameters[i];
 
-                InitializeSpawnedLane(newLane, laneParameters.CenterKey);
+                InitializeBRELane(newLane, laneParameters.CenterKey);
                 newLane.MultiplyScale(laneParameters.Width);
                 newLane.MultiplyScale(0.95f);
                 newLane.EnableFromPool();
@@ -781,8 +810,8 @@ namespace YARG.Gameplay.Player
 
         protected override void FinishDestruction()
         {
-            _leftOutOfRangeTween.Kill();
-            _rightOutOfRangeTween.Kill();
+            _leftOutOfRangeTween?.Kill();
+            _rightOutOfRangeTween?.Kill();
             base.FinishDestruction();
         }
 

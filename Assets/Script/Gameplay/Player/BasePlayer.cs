@@ -1,7 +1,8 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using PlasticBand.Haptics;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using YARG.Core;
 using YARG.Core.Audio;
 using YARG.Core.Chart;
 using YARG.Core.Engine;
@@ -14,7 +15,6 @@ using YARG.Helpers.Extensions;
 using YARG.Helpers.UI;
 using YARG.Input;
 using YARG.Multiplayer;
-using YARG.Playback;
 using YARG.Player;
 using YARG.Settings;
 
@@ -100,6 +100,8 @@ namespace YARG.Gameplay.Player
         private Dictionary<int, GameInput> LastInputs { get; } = new();
         private Dictionary<int, GameInput> InputsToSendOnResume { get; } = new();
 
+        protected SongChart Chart { get; private set; }
+
         protected SyncTrack SyncTrack { get; private set; }
 
         protected bool IsInitialized { get; private set; }
@@ -125,7 +127,12 @@ namespace YARG.Gameplay.Player
 
         private float _noteSpeedDifficultyScale;
 
-        protected EngineManager.EngineContainer EngineContainer;
+        public EngineManager.EngineContainer EngineContainer;
+
+        protected bool PlayerHasFailed;
+
+        public bool IsActive => Player.IsActive;
+        public bool IsBot    => Player.Profile.IsBot;
 
         protected override void GameplayAwake()
         {
@@ -186,6 +193,12 @@ namespace YARG.Gameplay.Player
             HighwayIndex = index;
             Player = player;
 
+            if (!Player.IsReplay)
+            {
+                Player.MenuInput += OnMenuInput;
+            }
+
+            Chart = chart;
             SyncTrack = chart.SyncTrack;
 
             LastHighScore = lastHighScore;
@@ -227,6 +240,11 @@ namespace YARG.Gameplay.Player
         public abstract void Rewind(double visualTime);
         public abstract void PostRewind(double visualTime);
 
+        protected virtual void ResetDifficulty(double time)
+        {
+            _noteSpeedDifficultyScale = Player.Profile.CurrentDifficulty.NoteSpeedScale();
+        }
+
         public virtual void ResetPracticeSection()
         {
             LastCombo = 0;
@@ -262,6 +280,7 @@ namespace YARG.Gameplay.Player
         {
             if (!Player.IsReplay)
             {
+                Player.MenuInput -= OnMenuInput;
                 UnsubscribeFromInputEvents();
             }
 
@@ -274,6 +293,11 @@ namespace YARG.Gameplay.Player
 
         protected virtual void UpdateInputs(double time)
         {
+            if (!IsActive)
+            {
+                return;
+            }
+
             if (Player.IsRemote)
             {
                 UpdateRemoteInputs(time);
@@ -370,7 +394,7 @@ namespace YARG.Gameplay.Player
                 SantrollerHaptics.Remove(haptics);
             }
 
-            if (!GameManager.Paused && SettingsManager.Settings.PauseOnDeviceDisconnect.Value)
+            if (GameManager != null && !GameManager.Paused && SettingsManager.Settings.PauseOnDeviceDisconnect.Value)
             {
                 GameManager.SetPaused(true);
             }
@@ -387,11 +411,25 @@ namespace YARG.Gameplay.Player
             InputsToSendOnResume.Clear();
         }
 
+        protected virtual bool IsMenuOpen => false;
+
+        protected virtual void OnMenuInput(YargPlayer player, ref GameInput input)
+        {
+        }
+
         protected void OnGameInput(ref GameInput input)
         {
             // Ignore completely if the song hasn't started yet or player failed
-            if (!GameManager.Started || GameManager.PlayerHasFailed)
+            if (!GameManager.Started || PlayerHasFailed || !IsActive)
+            {
+                YargLogger.LogFormatDebug("Ignoring input: Started: {0} Failed: {1} IsActive: {2}", GameManager.Started, PlayerHasFailed, IsActive);
                 return;
+            }
+
+            if (IsMenuOpen && !SettingsManager.Settings.PauseOnMenuOpen.Value)
+            {
+                return;
+            }
 
             // Ignore while paused
             if (GameManager.Paused || GameManager.Rewinding)
@@ -418,7 +456,7 @@ namespace YARG.Gameplay.Player
 
             LastInputs[input.Action] = input;
 
-            double adjustedTime = GameManager.GetRelativeInputTime(input.Time);
+            double adjustedTime = GameManager.GetInputTime(input.Time);
             // Apply input offset
             adjustedTime += InputCalibration;
             input = new(adjustedTime, input.Action, input.Integer);
@@ -460,7 +498,8 @@ namespace YARG.Gameplay.Player
         protected virtual void OnStarPowerStatus(bool active)
         {
             var deploySample = SfxSample.StarPowerDeploy;
-            if (SettingsManager.Settings.UseCrowdFx.Value == CrowdFxMode.Enabled)
+            if (SettingsManager.Settings.UseCrowdCheering.Value &&
+                !GlobalVariables.State.CrowdSfxVenueOverride)
             {
                 deploySample = SfxSample.StarPowerDeployCrowd;
             }

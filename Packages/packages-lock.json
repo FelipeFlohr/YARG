@@ -44,12 +44,12 @@
       "dependencies": {},
       "hash": "515fb93d2933b13fd3a12c6b7776533bc1625eae"
     },
-    "com.marijnzwemmer.unity-toolbar-extender": {
-      "version": "1.4.2",
+    "com.nobi.roundedcorners": {
+      "version": "https://github.com/kirevdokimov/Unity-UI-Rounded-Corners.git",
       "depth": 0,
-      "source": "registry",
+      "source": "git",
       "dependencies": {},
-      "url": "https://package.openupm.com"
+      "hash": "33135342e868201eb0d4cef821ecab90caca373e"
     },
     "com.starasgames.tmpro-dynamic-data-cleaner": {
       "version": "1.0.0",
@@ -68,7 +68,7 @@
       "url": "https://package.openupm.com"
     },
     "com.thenathannator.plasticband": {
-      "version": "0.9.0",
+      "version": "0.10.0",
       "depth": 0,
       "source": "registry",
       "dependencies": {
@@ -200,7 +200,7 @@
     },
     "com.unity.nuget.mono-cecil": {
       "version": "1.11.6",
-      "depth": 3,
+      "depth": 1,
       "source": "registry",
       "dependencies": {},
       "url": "https://packages.unity.com"
@@ -210,6 +210,20 @@
       "depth": 0,
       "source": "registry",
       "dependencies": {},
+      "url": "https://packages.unity.com"
+    },
+    "com.unity.pipeline": {
+      "version": "0.9.1-exp.1",
+      "depth": 0,
+      "source": "registry",
+      "dependencies": {
+        "com.unity.test-framework": "1.1.33",
+        "com.unity.nuget.mono-cecil": "1.11.6",
+        "com.unity.modules.uielements": "1.0.0",
+        "com.unity.modules.jsonserialize": "1.0.0",
+        "com.unity.modules.screencapture": "1.0.0",
+        "com.unity.nuget.newtonsoft-json": "3.0.2"
+      },
       "url": "https://packages.unity.com"
     },
     "com.unity.probuilder": {

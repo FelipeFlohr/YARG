@@ -16,6 +16,7 @@ namespace YARG.Gameplay.Visuals
         private static readonly int _scrollProperty         = Shader.PropertyToID("_Scroll");
         private static readonly int _starpowerStateProperty = Shader.PropertyToID("_Starpower_State");
         private static readonly int _starpowerTimeProperty  = Shader.PropertyToID("_Starpower_Start_Time");
+        private static readonly int _failStateProperty      = Shader.PropertyToID("_Fail_State");
         private static readonly int _wavinessProperty       = Shader.PropertyToID("_Waviness");
 
         private static readonly int _layer1ColorProperty = Shader.PropertyToID("_Layer_1_Color");
@@ -52,6 +53,18 @@ namespace YARG.Gameplay.Visuals
 
             public static Preset FromHighwayPreset(HighwayPreset preset, bool groove)
             {
+                var baseTexture = preset.BackgroundImage;
+                var sidePattern = preset.SideImage;
+                if (!preset.DefaultPreset && preset.GetExtraContentFolder() is { } extraContentFolder)
+                {
+                    baseTexture = baseTexture == null
+                        ? null
+                        : new FileInfo(Path.Combine(extraContentFolder, baseTexture.Name));
+                    sidePattern = sidePattern == null
+                        ? null
+                        : new FileInfo(Path.Combine(extraContentFolder, sidePattern.Name));
+                }
+
                 if (groove)
                 {
                     return new Preset
@@ -60,8 +73,8 @@ namespace YARG.Gameplay.Visuals
                         Layer2 = preset.BackgroundGrooveBaseColor2.ToUnityColor(),
                         Layer3 = preset.BackgroundGrooveBaseColor3.ToUnityColor(),
                         Layer4 = preset.BackgroundGroovePatternColor.ToUnityColor(),
-                        BaseTexture = preset.BackgroundImage,
-                        SidePattern = preset.SideImage,
+                        BaseTexture = baseTexture,
+                        SidePattern = sidePattern,
                         BaseWaviness = preset.BaseWaviness,
                         SideWaviness = preset.SideWaviness
                     };
@@ -73,8 +86,8 @@ namespace YARG.Gameplay.Visuals
                     Layer2 = preset.BackgroundBaseColor2.ToUnityColor(),
                     Layer3 = preset.BackgroundBaseColor3.ToUnityColor(),
                     Layer4 = preset.BackgroundPatternColor.ToUnityColor(),
-                    BaseTexture = preset.BackgroundImage,
-                    SidePattern = preset.SideImage,
+                    BaseTexture = baseTexture,
+                    SidePattern = sidePattern,
                     BaseWaviness = preset.BaseWaviness,
                     SideWaviness = preset.SideWaviness
                 };
@@ -129,6 +142,12 @@ namespace YARG.Gameplay.Visuals
         {
             get => _material.GetFloat(_starpowerStateProperty);
             set => _material.SetFloat(_starpowerStateProperty, value);
+        }
+
+        public float FailState
+        {
+            get => _material.GetFloat(_failStateProperty);
+            set => _material.SetFloat(_failStateProperty, value);
         }
 
         [SerializeField]
@@ -192,6 +211,8 @@ namespace YARG.Gameplay.Visuals
             // Waviness applies whether or not custom textures are used
             _material.SetFloat(_baseWavinessProperty, _normalPreset.BaseWaviness);
             _material.SetFloat(_sideWavinessProperty, _normalPreset.SideWaviness);
+
+            _material.SetFloat(_failStateProperty, 0f);
 
             SetTextures();
         }
