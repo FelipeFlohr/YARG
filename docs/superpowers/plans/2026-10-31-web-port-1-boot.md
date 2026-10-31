@@ -25,6 +25,7 @@
 - Branch do YARG: `claude/web-port`. Branch do Core: `claude/web-port`.
 - Builds e testes Unity exigem `UNITY_EDITOR` definida e o módulo WebGL Build Support; se faltar, pare e avise.
 - Mudanças de UI, template e settings: marcar "não verificadas visualmente" no PR.
+- Navegadores de teste nunca aparecem nem fazem som: Playwright sempre headless (nunca `headed`/`--headed`), com `--mute-audio` nos `launchOptions.args`. Se algum teste precisar de navegador com janela, ela abre minimizada (`--start-minimized`) e muda.
 
 ## Review Focus
 
@@ -299,7 +300,7 @@ git commit -m "Add the WebGL template, StreamingAssets preload and web build scr
 - Consumes: build de `~/yarg-build-web` (Task 6), log `Main menu ready` (Task 5), chaves `yarg.*` (Task 4), overlay `#yarg-start` (Task 6).
 - Produces:
   - `serve.mjs`: servidor `http` do Node na porta de `YARG_WEB_PORT` (padrão `8089`) servindo `YARG_WEB_BUILD` (padrão `~/yarg-build-web`). Arquivos `*.br` com `Content-Encoding: br` e o `Content-Type` do arquivo sem o `.br` (`.js` → `application/javascript`, `.wasm` → `application/wasm`, `.data` → `application/octet-stream`).
-  - `playwright.config.mjs`: só Chromium, `webServer` rodando `serve.mjs`, timeout de 180 s por teste.
+  - `playwright.config.mjs`: só Chromium, `headless: true`, `launchOptions.args` com `--mute-audio`, `webServer` rodando `serve.mjs`, timeout de 180 s por teste.
   - helper `bootToMenu(page)`: navega, clica em `#yarg-start`, espera `Main menu ready` no console e falha se aparecer um `console.error` com `Exception`.
 
 - [ ] **Step 1: Escrever os testes**
