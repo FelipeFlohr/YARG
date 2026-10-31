@@ -42,3 +42,25 @@ grep "\[AutoTest\] PASS" "$RUN/player.log"
 - Harmless log noise: read-only `/game` (the loading screen tries to write `StreamingAssets/sources`), `libvlc.so.12`
   missing (only video backgrounds, which are disabled), a `FocusHandler` NullReferenceException.
 - One instance at a time on a 4 core machine.
+
+## Band scenarios
+
+Scenarios (`band4`, `same-instrument`, `keys`, `no-stems`) are defined in `scenarios.py`. The host starts first, the
+clients 20 s later (5 s apart, `--stagger` changes that), all inside one container with `--network none`.
+
+```bash
+python3 Tests/MultiplayerBand/run_scenario.py band4            # runs docker, copies logs, runs the checker
+python3 Tests/MultiplayerBand/run_scenario.py band4 --dry-run  # only prints the docker command
+python3 Tests/MultiplayerBand/check_band_logs.py band4 "$HOME/yarg-mp-banda-runs/band4"  # recheck existing logs
+```
+
+Logs and settings go to `~/yarg-mp-banda-runs/<scenario>/<instance>/`; the checker reads `<instance>.log`. Run the
+scripts without `-I` (isolated mode drops the script folder from `sys.path`).
+
+Checker unit tests (standard library only):
+
+```bash
+cd Tests/MultiplayerBand && python3 -I -m unittest discover -s . -v
+```
+
+(`python3 -I -m unittest test_check_band_logs` does not work: `-I` drops the current directory from `sys.path`.)
