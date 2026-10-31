@@ -99,6 +99,26 @@ namespace YARG.Multiplayer.Tests.AutoTest
         }
 
         [Test]
+        public void Generate_OnlyKeepsFretsOfNotesThatAreStillSustaining()
+        {
+            var notes = new List<GuitarNote>
+            {
+                new(FiveFretGuitarFret.Green, GuitarNoteType.Strum, GuitarNoteFlags.None, NoteFlags.None, 1.0, 0.7, 100, 70),
+                new(FiveFretGuitarFret.Red, GuitarNoteType.Strum, GuitarNoteFlags.None, NoteFlags.None, 1.3, 0, 130, 0),
+                new(FiveFretGuitarFret.Yellow, GuitarNoteType.Strum, GuitarNoteFlags.None, NoteFlags.None, 1.5, 0, 150, 0),
+                new(FiveFretGuitarFret.Orange, GuitarNoteType.Strum, GuitarNoteFlags.None, NoteFlags.None, 3.0, 0, 300, 0),
+            };
+
+            var inputs = ScriptedFiveFretInputs.Generate(notes, 50, 60);
+
+            var redReleases = inputs.Where(i => i.Action == (int) GuitarAction.Fret2 && !i.Button).ToList();
+            Assert.That(redReleases, Has.Count.EqualTo(1));
+            Assert.That(redReleases[0].Time, Is.LessThanOrEqualTo(1.5), "red is not a sustain, so it is let go for the next note");
+            var greenReleases = inputs.Where(i => i.Action == (int) GuitarAction.Fret1 && !i.Button).ToList();
+            Assert.That(greenReleases[0].Time, Is.GreaterThanOrEqualTo(1.7), "green is still sustaining");
+        }
+
+        [Test]
         public void Generate_HitsNothingInsideTheWindow()
         {
             var run = Play(30, 40);

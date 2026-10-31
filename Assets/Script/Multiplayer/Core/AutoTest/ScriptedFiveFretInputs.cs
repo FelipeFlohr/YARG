@@ -29,8 +29,9 @@ namespace YARG.Multiplayer.AutoTest
             int held = 0;
             double lastFretTime = double.NegativeInfinity;
             bool leftWindowEntry = false;
-            int sustainMask = 0;
-            double sustainEnd = double.NegativeInfinity;
+            // When each fret stops being part of a sustain (only notes with a sustain set it).
+            var sustainEnd = new double[FretBits];
+            ClearSustains(sustainEnd);
 
             foreach (var note in notes)
             {
@@ -45,7 +46,7 @@ namespace YARG.Multiplayer.AutoTest
                         held = 0;
                         lastFretTime = releaseTime;
                     }
-                    sustainMask = 0;
+                    ClearSustains(sustainEnd);
                 }
 
                 if (note.Time >= missFrom && note.Time <= missTo)
@@ -59,19 +60,28 @@ namespace YARG.Multiplayer.AutoTest
                     continue;
                 }
 
-                int mask = note.NoteMask & ((1 << FretBits) - 1);
-                if (mask != 0 && sustainMask != 0 && note.Time < sustainEnd && HighestBit(sustainMask) < LowestBit(mask))
+                int ownMask = note.NoteMask & ((1 << FretBits) - 1);
+                int mask = ownMask;
+                int sustained = SustainedMask(sustainEnd, note.Time);
+                if (mask != 0 && sustained != 0 && HighestBit(sustained) < LowestBit(mask))
                 {
-                    // Extended sustain: a player keeps the sustained (lower) fret down while playing higher notes,
-                    // letting go of it would drop the sustain and mute the instrument.
-                    mask |= sustainMask;
-                    sustainMask = mask;
-                    sustainEnd = System.Math.Max(sustainEnd, note.TimeEnd);
+                    // Extended sustain: a player keeps the sustained (lower) frets down while playing higher notes,
+                    // letting go of them would drop the sustain and mute the instrument.
+                    mask |= sustained;
                 }
                 else
                 {
-                    sustainMask = note.IsSustain ? mask : 0;
-                    sustainEnd = note.TimeEnd;
+                    ClearSustains(sustainEnd);
+                }
+                if (note.IsSustain)
+                {
+                    for (int bit = 0; bit < FretBits; bit++)
+                    {
+                        if ((ownMask & (1 << bit)) != 0)
+                        {
+                            sustainEnd[bit] = note.TimeEnd;
+                        }
+                    }
                 }
                 SetFrets(inputs, fretTime, held, mask);
                 held = mask;
@@ -99,6 +109,27 @@ namespace YARG.Multiplayer.AutoTest
                 sorted.Add(item.Input);
             }
             return sorted;
+        }
+
+        private static void ClearSustains(double[] sustainEnd)
+        {
+            for (int bit = 0; bit < sustainEnd.Length; bit++)
+            {
+                sustainEnd[bit] = double.NegativeInfinity;
+            }
+        }
+
+        private static int SustainedMask(double[] sustainEnd, double time)
+        {
+            int mask = 0;
+            for (int bit = 0; bit < sustainEnd.Length; bit++)
+            {
+                if (time < sustainEnd[bit])
+                {
+                    mask |= 1 << bit;
+                }
+            }
+            return mask;
         }
 
         private static int LowestBit(int mask)

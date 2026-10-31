@@ -274,6 +274,19 @@ namespace YARG.Multiplayer
             return true;
         }
 
+        /// <summary>
+        /// Vocal parts have a single chart: their byte in the song's part values holds the sub-track mask,
+        /// not a difficulty mask (<c>song[Vocals][Beginner]</c> only means "has lead vocals"), so any difficulty is valid.
+        /// </summary>
+        private static bool HasDifficulty(SongEntry song, Instrument instrument, Difficulty difficulty)
+        {
+            if (instrument is Instrument.Vocals or Instrument.Harmony or Instrument.PartyVocals)
+            {
+                return song.HasInstrument(instrument);
+            }
+            return song[instrument][difficulty];
+        }
+
         /// <returns>False only when the requested instrument isn't in the song.</returns>
         private static bool PickPart(IMultiplayerSession session, SongEntry song)
         {
@@ -293,7 +306,7 @@ namespace YARG.Multiplayer
                     : EnumExtensions<Difficulty>.Values.Reverse().ToArray();
                 foreach (var difficulty in difficulties)
                 {
-                    if (song[wanted][difficulty])
+                    if (HasDifficulty(song, wanted, difficulty))
                     {
                         profile.CurrentInstrument = wanted;
                         profile.CurrentDifficulty = difficulty;
@@ -303,7 +316,7 @@ namespace YARG.Multiplayer
                     }
                 }
                 Log($"FAIL: {wanted} has no requested difficulty chart; difficulties: " +
-                    string.Join(", ", EnumExtensions<Difficulty>.Values.Where(d => song[wanted][d])));
+                    string.Join(", ", EnumExtensions<Difficulty>.Values.Where(d => HasDifficulty(song, wanted, d))));
                 return false;
             }
 
@@ -311,7 +324,7 @@ namespace YARG.Multiplayer
             {
                 foreach (var difficulty in EnumExtensions<Difficulty>.Values.Reverse())
                 {
-                    if (song[instrument][difficulty])
+                    if (HasDifficulty(song, instrument, difficulty))
                     {
                         profile.CurrentInstrument = instrument;
                         profile.CurrentDifficulty = difficulty;

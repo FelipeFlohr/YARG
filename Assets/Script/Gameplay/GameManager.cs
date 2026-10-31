@@ -186,7 +186,7 @@ namespace YARG.Gameplay
         private int _originalSleepTimeout;
 
         private const double MULTIPLAYER_LEAVE_WINDOW    = 1;
-        private const double MULTIPLAYER_FINISH_TIMEOUT  = 3;
+        private const double MULTIPLAYER_FINISH_TIMEOUT  = 15;
 
         private double _lastMultiplayerPausePress = double.NegativeInfinity;
         private bool   _multiplayerEnding;
