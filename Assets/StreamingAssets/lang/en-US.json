@@ -346,6 +346,8 @@
             "SittingOutSong": "You don't have this song, so you are sitting this one out.",
             "SongMissing": "The song to play is missing from your library.",
             "PressAgainToLeave": "Press pause again to leave the match.",
+            "WaitingForPlayers": "Waiting for the other players: {0}",
+            "WaitingForPlayersToFinish": "Waiting for the other players to finish: {0}",
             "Status": {
                 "Idle": "Waiting",
                 "MissingSong": "Missing song",
