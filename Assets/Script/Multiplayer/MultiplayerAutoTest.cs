@@ -593,6 +593,19 @@ namespace YARG.Multiplayer
             }
             await UniTask.Delay(TimeSpan.FromSeconds(3));
 
+            // A fresh data folder has no profiles at all
+            while (PlayerContainer.Profiles.Count < playerCount)
+            {
+                var guitar = Instrument.FiveFretGuitar;
+                PlayerContainer.AddProfile(new YargProfile
+                {
+                    Name = $"AutoTest {PlayerContainer.Profiles.Count + 1}",
+                    GameMode = guitar.ToNativeGameMode(),
+                    CurrentInstrument = guitar,
+                });
+                Log($"Created profile {PlayerContainer.Profiles[PlayerContainer.Profiles.Count - 1].Name}");
+            }
+
             foreach (var profile in PlayerContainer.Profiles)
             {
                 if (PlayerContainer.Players.Count(p => !p.SittingOut) >= playerCount)
