@@ -325,7 +325,9 @@ namespace YARG.Multiplayer.Session
             {
                 rejection = RejectCode.VersionMismatch;
             }
-            else if (State != SessionState.Lobby && State != SessionState.Results)
+            // Only a song that's loading or playing locks the session; while a song is being
+            // offered the newcomer just gets the offer too
+            else if (State == SessionState.Loading || State == SessionState.Playing)
             {
                 rejection = RejectCode.SessionInProgress;
             }
@@ -353,6 +355,10 @@ namespace YARG.Multiplayer.Session
             peer.Player = player;
 
             _transport.Send(peer.PeerId, MessageCodec.Encode(new Welcome(player.PlayerId)));
+            if (State == SessionState.Transferring && CurrentOffer != null)
+            {
+                _transport.Send(peer.PeerId, MessageCodec.Encode(CurrentOffer));
+            }
             _lobbyDirty = true;
         }
 

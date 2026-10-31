@@ -178,6 +178,31 @@ namespace YARG.Multiplayer.Tests.Session
         }
 
         [Test]
+        public void Join_WhileSongIsOffered_IsAcceptedAndReceivesTheOffer()
+        {
+            using var h = new Harness();
+            var song = Offer(1, 10);
+            h.Host.OfferSong(song, () => new MemoryStream(new byte[10]));
+            h.Pump();
+
+            var late = new ClientSession(h.Network.CreateClient(), new SessionConfig(VERSION, "Late"), () => h.Now);
+            h.Clients.Add(late);
+            SongOffer? offered = null;
+            late.SongOffered += offer =>
+            {
+                offered = offer;
+                late.RespondToOffer(true);
+            };
+            late.Connect("ignored", ProtocolInfo.DefaultPort);
+            h.Pump();
+
+            Assert.That(late.RejectReason, Is.Null);
+            Assert.That(late.State, Is.EqualTo(SessionState.Transferring));
+            Assert.That(offered!.Hash, Is.EqualTo(song.Hash));
+            Assert.That(PlayerIn(h.Host, 1).Status, Is.EqualTo(LobbyPlayerStatus.HasSong));
+        }
+
+        [Test]
         public void Join_RejectsWhilePlaying()
         {
             using var h = new Harness();
