@@ -405,14 +405,16 @@ namespace YARG.Multiplayer
         private async UniTaskVoid InstallAsync(ClientSession client, SongReceiver receiver, SongOffer offer)
         {
             SongEntry entry = null;
+            bool installFailed = false;
             try
             {
                 entry = await MultiplayerSongLibrary.InstallAndRegister(receiver, offer);
             }
-            catch (Exception e) when (e is IOException || e is InvalidDataException ||
-                e is UnauthorizedAccessException)
+            catch (Exception e)
             {
+                // Anything that escapes here would leave the host waiting on this client forever
                 YargLogger.LogException(e, "Failed to install multiplayer song");
+                installFailed = true;
             }
             finally
             {
@@ -425,7 +427,11 @@ namespace YARG.Multiplayer
                 return;
             }
 
-            if (entry != null)
+            if (installFailed)
+            {
+                client.ReportSongFailed("couldn't install the song");
+            }
+            else if (entry != null)
             {
                 client.ReportSongReady();
             }

@@ -159,7 +159,7 @@ namespace YARG.Song
 
         public static void LoadSprites(LoadingContext context)
         {
-            context.SetLoadingText("Loading source icons...");
+            context?.SetLoadingText("Loading source icons...");
 
             _default.LoadSprite();
             foreach (var node in SongContainer.Sources)
