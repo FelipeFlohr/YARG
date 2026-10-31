@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using DG.Tweening;
 using UnityEngine;
@@ -35,6 +35,8 @@ namespace YARG.Gameplay.HUD
         private Slider _needlePrefab;
         [SerializeField]
         private RectTransform _sliderContainer;
+        [SerializeField]
+        private Image _meterSpGlow;
 
         private Slider[]  _playerSliders;
         private Slider[]  _needleSliders;
@@ -46,8 +48,11 @@ namespace YARG.Gameplay.HUD
         private Tweener   _meterGreenTweener;
         private Tweener   _bandFillTweener;
         private Tweener   _meterPositionTweener;
+        private Tweener   _meterGlowFillTweener;
+        private Sequence  _meterGlowPulseSequence;
         private float[]   _previousPlayerHappiness;
         private float     _previousBandHappiness;
+        private bool      _sp;
 
         private MeterColor _previousMeterColor;
 
@@ -121,6 +126,19 @@ namespace YARG.Gameplay.HUD
                 Pause().
                 SetLink(_meterContainer);
 
+            // These values are unimportant, since they get changed in Update anyway
+            _meterGlowFillTweener = _meterSpGlow.DOFillAmount(1f, 0.8f)
+                .Pause()
+                .SetLink(_meterSpGlow.gameObject)
+                .SetAutoKill(false);
+
+            _meterGlowPulseSequence = DOTween.Sequence()
+                .Append(_meterSpGlow.transform.DOScaleX(0.9f, 0.7f))
+                .SetEase(Ease.InOutSine)
+                .SetLoops(-1, LoopType.Yoyo)
+                .Pause()
+                .SetLink(_meterSpGlow.gameObject)
+                .SetAutoKill(false);
 
             // attach the slider instances to the scene and apply the correct icon
             for (int i = _players.Count - 1; i >= 0; i--)
@@ -135,11 +153,11 @@ namespace YARG.Gameplay.HUD
                 _needleSliders[i].handleRect.DOAnchorPosX(SPRITE_INITIAL_OFFSET, 0.125f).SetAutoKill(false).SetLink(_needleSliders[i].gameObject);
 
                 var handleImage = _playerSliders[i].handleRect.GetComponentInChildren<Image>();
-                var spriteName = _players[i].GetInstrumentSprite();
+                var spriteName = _players[i].GetInstrumentSprite(_gameManager.Song);
 
                 var sprite = Addressables.LoadAssetAsync<Sprite>(spriteName).WaitForCompletion();
                 handleImage.sprite = sprite;
-                handleImage.color = _players[i].GetHarmonyColor();
+                handleImage.color = _players[i].GetGameplayIconColor();
 
                 _playerSliders[i].value = 0.01f;
                 _needleSliders[i].value = 0.01f;
@@ -175,13 +193,24 @@ namespace YARG.Gameplay.HUD
                 UpdateMeterFill();
             }
 
+            bool anyPlayerInSp = false;
             for (var i = _players.Count - 1; i >= 0; i--)
             {
+                if (!_engineManager.IsRegistered(_players[i]))
+                {
+                    HidePlayerMeter(i);
+                    continue;
+                }
+
+                if (_players[i].BaseEngine.BaseStats.IsStarPowerActive)
+                {
+                    anyPlayerInSp = true;
+                }
                 int overlap = 0;
                 // Check if we will overlap another icon
                 for (var j = i; j >= 0; j--)
                 {
-                    if (j == i)
+                    if (j == i || !_engineManager.IsRegistered(_players[j]))
                     {
                         // Ignore self
                         continue;
@@ -228,8 +257,9 @@ namespace YARG.Gameplay.HUD
                 }
 
                 _previousPlayerHappiness[i] = _players[i].Happiness;
-
             }
+
+            UpdateMeterGlow(anyPlayerInSp);
         }
 
         private void UpdateMeterFill()
@@ -246,6 +276,37 @@ namespace YARG.Gameplay.HUD
             _bandFillTweener.ChangeValues(_fillImage.fillAmount, happiness).Play();
 
             _previousBandHappiness = _engineManager.Happiness;
+        }
+
+        private void UpdateMeterGlow(bool anyPlayerInSp)
+        {
+            // Happiness 0 = Glow Fill 0.05
+            // Happiness 1 = Glow Fill 0.95
+            // Everything else needs to be scaled between those two.
+            float glowHeight = _engineManager.Happiness switch
+            {
+                < 0 => 0f,
+                > 1 => 1f,
+                _   => Mathf.Lerp(0.05f, 0.95f, _engineManager.Happiness)
+            };
+
+            if (anyPlayerInSp && !_sp)
+            {
+                _meterGlowFillTweener.ChangeValues(_meterSpGlow.fillAmount, glowHeight, (0.8f * _engineManager.Happiness));
+                _meterGlowFillTweener.Restart();
+            }
+            else if (!anyPlayerInSp && _sp)
+            {
+                _meterGlowFillTweener.ChangeValues(_meterSpGlow.fillAmount, 0f, (0.8f * _engineManager.Happiness));
+                _meterGlowFillTweener.Restart();
+            }
+            else if (anyPlayerInSp && !_meterGlowFillTweener.IsPlaying())
+            {
+                var delta = Mathf.Max(Math.Abs(glowHeight - _meterSpGlow.fillAmount), 0.05f);
+                _meterGlowFillTweener.ChangeValues(_meterSpGlow.fillAmount, glowHeight, 0.8f * delta);
+                _meterGlowFillTweener.Restart();
+            }
+            _sp = anyPlayerInSp;
         }
 
         private void ApplyColor(MeterColor color)
@@ -295,14 +356,70 @@ namespace YARG.Gameplay.HUD
             }
         }
 
-        private static MeterColor GetMeterColor(float happiness)
+        private void HidePlayerMeter(int index)
         {
-            return happiness switch
+            if (_playerSliders[index].gameObject.activeSelf)
+            {
+                _playerSliders[index].gameObject.SetActive(false);
+                _needleSliders[index].gameObject.SetActive(false);
+                _playerHappinessTweeners[index].Pause();
+                _needleHappinessTweeners[index].Pause();
+                _xposTweeners[index].Pause();
+            }
+        }
+
+        private static MeterColor GetMeterColor(float happiness) =>
+            happiness switch
             {
                 < 0.333f => MeterColor.Red,
                 < 0.666f => MeterColor.Yellow,
                 _        => MeterColor.Green
             };
+
+        private void OnDestroy()
+        {
+            _meterRedTweener?.Kill();
+            _meterYellowTweener?.Kill();
+            _meterGreenTweener?.Kill();
+            _bandFillTweener?.Kill();
+            _meterPositionTweener?.Kill();
+            _meterGlowFillTweener?.Kill();
+            _meterGlowPulseSequence?.Kill();
+
+            if (_xposTweeners != null)
+            {
+                foreach (var tween in _xposTweeners)
+                {
+                    tween?.Kill();
+                }
+            }
+
+            if (_needleSliders != null)
+            {
+                foreach (var slider in _needleSliders)
+                {
+                    if (slider != null && slider.handleRect != null)
+                    {
+                        slider.handleRect.DOKill();
+                    }
+                }
+            }
+
+            if (_playerHappinessTweeners != null)
+            {
+                foreach (var tween in _playerHappinessTweeners)
+                {
+                    tween?.Kill();
+                }
+            }
+
+            if (_needleHappinessTweeners != null)
+            {
+                foreach (var tween in _needleHappinessTweeners)
+                {
+                    tween?.Kill();
+                }
+            }
         }
 
         private enum MeterColor
@@ -311,5 +428,11 @@ namespace YARG.Gameplay.HUD
             Yellow,
             Green
         }
+    }
+
+    internal static class FailMeterExtensions
+    {
+        public static bool IsRegistered(this EngineManager engineManager, EngineManager.EngineContainer player) =>
+            engineManager.Engines.Contains(player);
     }
 }

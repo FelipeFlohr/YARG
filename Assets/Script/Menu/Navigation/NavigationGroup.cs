@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -10,6 +10,8 @@ namespace YARG.Menu.Navigation
     public sealed class NavigationGroup : MonoBehaviour
     {
         private static readonly List<NavigationGroup> _navGroupsStack = new();
+
+        public static event Action CurrentChanged;
 
         public static NavigationGroup CurrentNavigationGroup => _navGroupsStack.Count <= 0
             ? null
@@ -29,6 +31,8 @@ namespace YARG.Menu.Navigation
         private bool _selectFirst;
 
         public int Count => _navigatables.Count;
+
+        public IReadOnlyList<NavigatableBehaviour> Navigatables => _navigatables;
 
         public int? SelectedIndex { get; private set; } = null;
 
@@ -61,7 +65,7 @@ namespace YARG.Menu.Navigation
         {
             if (_defaultGroup)
             {
-                _navGroupsStack.Add(this);
+                PushNavGroupToStack();
             }
 
             if (_selectFirst && SelectedBehaviour == null)
@@ -72,10 +76,12 @@ namespace YARG.Menu.Navigation
 
         private void OnDisable()
         {
+            var wasCurrent = CurrentNavigationGroup == this;
             // Remove this navigation group from the stack
-            if (_navGroupsStack.Contains(this))
+            _navGroupsStack.Remove(this);
+            if (wasCurrent)
             {
-                _navGroupsStack.Remove(this);
+                CurrentChanged?.Invoke();
             }
         }
 
@@ -113,8 +119,11 @@ namespace YARG.Menu.Navigation
         public void RemoveNavigatable(NavigatableBehaviour navigatable)
         {
             if (SelectedBehaviour == navigatable && SelectedBehaviour != null)
+            {
                 SelectedBehaviour.SetSelected(false, SelectionOrigin.Programmatically);
+            }
 
+            navigatable.SelectionStateChanged -= OnSelectionStateChanged;
             _navigatables.Remove(navigatable);
             navigatable.NavigationGroup = null;
         }
@@ -122,61 +131,98 @@ namespace YARG.Menu.Navigation
         public void ClearNavigatables()
         {
             ClearSelection();
+            foreach (var navigatable in _navigatables)
+            {
+                navigatable.SelectionStateChanged -= OnSelectionStateChanged;
+                navigatable.NavigationGroup = null;
+            }
             _navigatables.Clear();
         }
 
-        public void SelectFirst()
+        public void SelectFirst(SelectionOrigin selectionOrigin = SelectionOrigin.Programmatically)
         {
-            SelectAt(0);
+            for (int i = 0; i < _navigatables.Count; i++)
+            {
+                if (_navigatables[i].gameObject.activeInHierarchy)
+                {
+                    SelectAt(i, selectionOrigin);
+                    return;
+                }
+            }
         }
 
-        public void SelectLast()
+        public void SelectLast(SelectionOrigin selectionOrigin = SelectionOrigin.Programmatically)
         {
-            SelectAt(_navigatables.Count - 1);
+            for (int i = _navigatables.Count - 1; i >= 0; i--)
+            {
+                if (_navigatables[i].gameObject.activeInHierarchy)
+                {
+                    SelectAt(i, selectionOrigin);
+                    return;
+                }
+            }
         }
 
         public void SelectNext(bool isHeld = false)
         {
-            // Allows the user to quickly select an option without needing mouse
+            // Allows the user to quickly select an option without needing mouse.
+            // This is a genuine navigation input, so scroll the selection into view.
             if (SelectedIndex is null)
             {
-                SelectFirst();
+                SelectFirst(SelectionOrigin.Navigation);
                 return;
             }
 
-            // If the selection will go out of range...
-            if (SelectedIndex is not { } selected || selected < 0 || selected >= _navigatables.Count - 1)
+            if (SelectedIndex is not { } selected)
+                return;
+
+            // Search forward for the next active navigatable
+            for (int i = selected + 1; i < _navigatables.Count; i++)
             {
-                if (!isHeld && SettingsManager.Settings.WrapAroundNavigation.Value)
+                if (_navigatables[i].gameObject.activeInHierarchy)
                 {
-                    SelectAt(0, SelectionOrigin.Navigation);
+                    SelectAt(i, SelectionOrigin.Navigation);
+                    return;
                 }
-                return;
             }
 
-            SelectAt(selected + 1, SelectionOrigin.Navigation);
+            // Wrap around if enabled. Pass Navigation so ScrollViewNavigationUpdater
+            // scrolls the wrapped selection into view (it early-returns on other origins).
+            if (!isHeld && SettingsManager.Settings.WrapAroundNavigation.Value)
+            {
+                SelectFirst(SelectionOrigin.Navigation);
+            }
         }
 
         public void SelectPrevious(bool isHeld = false)
         {
-            // Allows the user to quickly select an option without needing mouse
+            // Allows the user to quickly select an option without needing mouse.
+            // This is a genuine navigation input, so scroll the selection into view.
             if (SelectedIndex is null)
             {
-                SelectLast();
+                SelectLast(SelectionOrigin.Navigation);
                 return;
             }
 
-            // If the selection is invalid...
-            if (SelectedIndex is not { } selected || selected <= 0)
+            if (SelectedIndex is not { } selected)
+                return;
+
+            // Search backward for the previous active navigatable
+            for (int i = selected - 1; i >= 0; i--)
             {
-                if (!isHeld && SettingsManager.Settings.WrapAroundNavigation.Value)
+                if (_navigatables[i].gameObject.activeInHierarchy)
                 {
-                    SelectAt(_navigatables.Count - 1, SelectionOrigin.Navigation);
+                    SelectAt(i, SelectionOrigin.Navigation);
+                    return;
                 }
-                return;
             }
 
-            SelectAt(selected - 1, SelectionOrigin.Navigation);
+            // Wrap around if enabled. Pass Navigation so ScrollViewNavigationUpdater
+            // scrolls the wrapped selection into view (it early-returns on other origins).
+            if (!isHeld && SettingsManager.Settings.WrapAroundNavigation.Value)
+            {
+                SelectLast(SelectionOrigin.Navigation);
+            }
         }
 
         public void SelectAt(int? index, SelectionOrigin selectionOrigin = SelectionOrigin.Programmatically)
@@ -208,7 +254,12 @@ namespace YARG.Menu.Navigation
 
                 index = _navigatables.IndexOf(navigatableBehaviour);
                 if (index < 0)
-                    throw new ArgumentException("The navigation item being selected is not present in the list!");
+                {
+                    // Can happen during tab rebuilds: an old button's onClick
+                    // fires before the old navigatable is fully destroyed.
+                    // Just ignore rather than crashing the EventSystem.
+                    return;
+                }
             }
             else
             {
@@ -234,9 +285,16 @@ namespace YARG.Menu.Navigation
 
         public void ClearSelection()
         {
+            var hadSelection = SelectedIndex.HasValue;
+            SelectedIndex = null;
             foreach (var navigatable in _navigatables)
             {
                 navigatable.SetSelected(false, SelectionOrigin.Programmatically);
+            }
+
+            if (hadSelection)
+            {
+                SelectionChanged?.Invoke(null, SelectionOrigin.Programmatically);
             }
         }
 
@@ -252,7 +310,9 @@ namespace YARG.Menu.Navigation
         {
             if (_canBeCurrent && CurrentNavigationGroup != this)
             {
+                _navGroupsStack.Remove(this);
                 _navGroupsStack.Add(this);
+                CurrentChanged?.Invoke();
             }
         }
 
@@ -263,8 +323,9 @@ namespace YARG.Menu.Navigation
                 return;
             }
 
+            _navGroupsStack.RemoveAt(_navGroupsStack.Count - 1);
             ClearSelection();
-            _navGroupsStack.Remove(this);
+            CurrentChanged?.Invoke();
         }
     }
 }

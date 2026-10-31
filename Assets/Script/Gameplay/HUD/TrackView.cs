@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using YARG.Core.Engine;
 using YARG.Gameplay.Visuals;
 using YARG.Helpers.Extensions;
+using YARG.Helpers.UI;
 using YARG.Player;
 
 namespace YARG.Gameplay.HUD
@@ -29,6 +31,13 @@ namespace YARG.Gameplay.HUD
         [SerializeField]
         private PlayerNameDisplay _playerNameDisplay;
 
+        [SerializeField]
+        private TrackPlayerMenu _playerMenuPrefab;
+
+        private TrackPlayerMenu _playerMenu;
+
+        public bool IsPlayerMenuOpen => _playerMenu?.IsOpen == true;
+
 
         private HighwayCameraRendering _highwayRenderer;
         private Vector3 _lastTrackPlayerPosition;
@@ -41,6 +50,11 @@ namespace YARG.Gameplay.HUD
         private Canvas _highwayEditCanvas;
         private RectTransform _highwayEditParentRect;
         private bool _defaultsInitialized;
+        private int _highwayIndex;
+
+        private bool _isSoloActive;
+        private bool _isUnisonActive;
+        private bool _isCodaActive;
 
         private readonly Vector3 _hiddenPosition = new(-10000f, -10000f, 0f);
         private float ExtraTopElementOffset => 8f * Screen.height / 1000f;
@@ -63,6 +77,8 @@ namespace YARG.Gameplay.HUD
 
         public void UpdateHUDPosition(int highwayIndex, int highwayCount)
         {
+            _highwayIndex = highwayIndex;
+
             // Scale ui according to number of highways,
             // 1 highway = 1.0 scale, 2 highways = 0.9 scale, 3 highways = 0.8 scale, etc, minimum of 0.5
             var newScale = Math.Max(0.5f, 1.1f - (0.1f * highwayCount));
@@ -143,6 +159,11 @@ namespace YARG.Gameplay.HUD
             SetHighwayOffsetX(hasCustomPosition ? _highwayDraggable.CurrentPosition.x : 0f);
 
             var trackBounds = _highwayRenderer.GetTrackBoundsScreenSpace(highwayIndex);
+            if (_playerMenu != null && _playerMenu.gameObject.activeSelf)
+            {
+                UpdatePlayerMenuPosition(highwayIndex);
+            }
+
             if (trackBounds == null)
             {
                 _highwayEditContainer.position = _hiddenPosition;
@@ -167,6 +188,20 @@ namespace YARG.Gameplay.HUD
                 ? _highwayDraggable.CurrentPosition.x
                 : localCenter.Value.x;
             _highwayEditContainer.anchoredPosition = new Vector2(targetX, localCenter.Value.y);
+        }
+
+        private bool UpdatePlayerMenuPosition(int highwayIndex)
+        {
+            var bounds = _highwayRenderer.GetTrackBoundsScreenSpaceRaised(highwayIndex);
+            var baseX = _highwayRenderer.GetTrackBottomScreenX(highwayIndex);
+            if (!baseX.HasValue || bounds.width <= 0f)
+            {
+                _playerMenu.HideImmediate();
+                return false;
+            }
+
+            _playerMenu.SetLayout(baseScreenX: baseX.Value, trackWidth: bounds.width);
+            return true;
         }
 
         private void OnHighwayDraggablePositionChanged(Vector2 position)
@@ -198,9 +233,9 @@ namespace YARG.Gameplay.HUD
         public void StartSolo(SoloSection solo)
         {
             _soloBox.StartSolo(solo);
-
+            _isSoloActive = true;
             // No text notifications during the solo
-            _textNotifications.SetActive(false);
+            UpdateTextNotificationStatus();
         }
 
         public void EndSolo(int soloBonus)
@@ -208,8 +243,38 @@ namespace YARG.Gameplay.HUD
             _soloBox.EndSolo(soloBonus, () =>
             {
                 // Show text notifications again
-                _textNotifications.SetActive(true);
+                _isSoloActive = false;
+                UpdateTextNotificationStatus();
             });
+        }
+
+        public void StartUnison()
+        {
+            _isUnisonActive = true;
+            UpdateTextNotificationStatus();
+        }
+
+        public void EndUnison()
+        {
+            _isUnisonActive = false;
+            UpdateTextNotificationStatus();
+        }
+
+        public void StartCoda()
+        {
+            _isCodaActive = true;
+            UpdateTextNotificationStatus();
+        }
+
+        public void EndCoda()
+        {
+            _isCodaActive = false;
+            UpdateTextNotificationStatus();
+        }
+
+        private void UpdateTextNotificationStatus()
+        {
+            _textNotifications.SetActive(!_isSoloActive && !_isUnisonActive && !_isCodaActive);
         }
 
         public void UpdateNoteStreak(int streak)
@@ -242,15 +307,33 @@ namespace YARG.Gameplay.HUD
             _textNotifications.ShowStarPowerReady();
         }
 
-        public void ShowStrongFinish()
+        public void ShowStrongFinish() => _textNotifications.ShowStrongFinish();
+
+        public void ShowPlayerName(YargPlayer player) => _playerNameDisplay.ShowPlayer(player);
+
+        public void CreatePlayerMenu(YargPlayer player, GameManager gameManager)
         {
-            _textNotifications.ShowStrongFinish();
+            _playerMenu = Instantiate(_playerMenuPrefab, transform);
+            _playerMenu.Initialize(player, gameManager);
+            _playerMenu.HideImmediate();
         }
 
-        public void ShowPlayerName(YargPlayer player)
+        public void OpenPlayerMenu(IReadOnlyList<PlayerMenuItem> items)
         {
-            _playerNameDisplay.ShowPlayer(player);
+            if (!UpdatePlayerMenuPosition(_highwayIndex))
+            {
+                return;
+            }
+
+            _playerMenu.SetItems(items);
+            _playerMenu.Open();
         }
+
+        public void ClosePlayerMenu() => _playerMenu?.Close();
+
+        public void RefreshPlayerMenu() => _playerMenu?.Refresh();
+
+        public void SetPlayerMenuItems(IReadOnlyList<PlayerMenuItem> items) => _playerMenu?.SetItems(items);
 
         public void ForceReset()
         {

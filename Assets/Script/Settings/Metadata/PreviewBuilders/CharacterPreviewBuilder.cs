@@ -1,16 +1,13 @@
-﻿using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using TMPro;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.UI;
 using YARG.Core.Logging;
-using YARG.Gameplay;
 using YARG.Helpers;
 using YARG.Helpers.Extensions;
 using YARG.Menu.Settings;
 using YARG.Settings.Preview;
-using YARG.Venue;
 
 namespace YARG.Settings.Metadata
 {
@@ -36,7 +33,7 @@ namespace YARG.Settings.Metadata
         {
         }
 
-        public async UniTask BuildPreviewWorld(Transform worldContainer)
+        public UniTask BuildPreviewWorld(Transform worldContainer)
         {
             _worldContainer = worldContainer;
 
@@ -51,7 +48,7 @@ namespace YARG.Settings.Metadata
             if (_previewWorld == null)
             {
                 YargLogger.LogError("Failed to load addressable character preview world prefab!");
-                return;
+                return UniTask.CompletedTask;
             }
 
             // Instantiate the preview prefab
@@ -61,7 +58,7 @@ namespace YARG.Settings.Metadata
 
             if (string.IsNullOrEmpty(CharacterFile))
             {
-                return;
+                return UniTask.CompletedTask;
             }
 
             if (_characterPrefab != null)
@@ -80,7 +77,7 @@ namespace YARG.Settings.Metadata
             if (bundle != null)
             {
                 _characterPrefab =
-                    bundle.LoadAsset<GameObject>(BundleBackgroundManager.CHARACTER_PREFAB_PATH.ToLowerInvariant());
+                    bundle.LoadAsset<GameObject>(BackgroundHelper.CHARACTER_PREFAB_PATH.ToLowerInvariant());
 
                 if (_characterPrefab == null)
                 {
@@ -93,7 +90,7 @@ namespace YARG.Settings.Metadata
             if (_characterPrefab != null)
             {
                 // Replace shaders if necessary
-                shaderBundle = await LoadMetalShaders(bundle, _characterPrefab);
+                shaderBundle = LoadMetalShaders(bundle, _characterPrefab);
                 _characterInstance = _previewScriptInstance.Initialize(_characterPrefab);
             }
 
@@ -107,7 +104,7 @@ namespace YARG.Settings.Metadata
                 bundle.Unload(false);
             }
 
-            return;
+            return UniTask.CompletedTask;
         }
 
         public async UniTask BuildPreviewUI(Transform uiContainer)
@@ -145,7 +142,7 @@ namespace YARG.Settings.Metadata
             previewTexture.uvRect = rect;
         }
 
-        public static async UniTask ChangeCharacter(string path)
+        public static void ChangeCharacter(string path)
         {
             CharacterFile = path;
 
@@ -166,7 +163,7 @@ namespace YARG.Settings.Metadata
                     YargLogger.LogFormatError("Failed to load character bundle from {0}", CharacterFile);
                     return;
                 }
-                _characterPrefab = bundle.LoadAsset<GameObject>(BundleBackgroundManager.CHARACTER_PREFAB_PATH.ToLowerInvariant());
+                _characterPrefab = bundle.LoadAsset<GameObject>(BackgroundHelper.CHARACTER_PREFAB_PATH.ToLowerInvariant());
             }
             else
             {
@@ -189,7 +186,7 @@ namespace YARG.Settings.Metadata
                 return;
             }
 
-            shaderBundle = await LoadMetalShaders(bundle, _characterPrefab);
+            shaderBundle = LoadMetalShaders(bundle, _characterPrefab);
 
             if (_previewWorld == null)
             {
@@ -222,12 +219,9 @@ namespace YARG.Settings.Metadata
             }
         }
 
-        // TODO: Refactor the AssetBundle loading such that BackgroundManager and this can share code
-#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
-        private static async UniTask<AssetBundle> LoadMetalShaders(AssetBundle bundle, GameObject bg)
-#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
+        private static AssetBundle LoadMetalShaders(AssetBundle bundle, GameObject bg)
         {
-            return await BackgroundHelper.LoadMetalShaders(bundle, bg, BackgroundHelper.ExportType.Character);
+            return BackgroundHelper.LoadMetalShaders(bundle, bg, BackgroundHelper.ExportType.Character);
         }
     }
 }

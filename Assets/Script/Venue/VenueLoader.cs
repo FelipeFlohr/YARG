@@ -20,6 +20,7 @@ namespace YARG.Venue
     {
         private static readonly string _venueFolder = Path.Combine(PathHelper.PersistentDataPath, "venue");
         private static readonly string _defaultVenue = Path.Combine(Application.streamingAssetsPath, "venue", "default.yarground");
+        private static string _mostRecentGlobal;
         public static string VenueFolder
         {
             get
@@ -40,7 +41,7 @@ namespace YARG.Venue
             source = VenueSource.Song;
             if (!SettingsManager.Settings.DisablePerSongBackgrounds.Value)
             {
-                result = song.LoadBackground();
+                result = song.LoadBackground(SettingsManager.Settings.CensorMatureContent.Value);
             }
 
             if (!SettingsManager.Settings.DisableGlobalBackgrounds.Value && result == null)
@@ -52,6 +53,11 @@ namespace YARG.Venue
             if (!SettingsManager.Settings.DisableDefaultBackground.Value && result == null)
             {
                 result = LoadDefaultVenue();
+            }
+
+            if (source != VenueSource.Global)
+            {
+                _mostRecentGlobal = null;
             }
 
             return result;
@@ -80,6 +86,12 @@ namespace YARG.Venue
                 filePaths.AddRange(Directory.EnumerateFiles(launcherVenueFolder, "*.yarground", PathHelper.SafeSearchOptions));
             }
 
+            if (filePaths.Count > 1 && !string.IsNullOrEmpty(_mostRecentGlobal))
+            {
+                // remove _mostRecentVenue from filePaths
+                filePaths.Remove(_mostRecentGlobal);
+            }
+
             while (filePaths.Count > 0)
             {
                 int index = Random.Range(0, filePaths.Count);
@@ -92,14 +104,17 @@ namespace YARG.Venue
                         var image = YARGImage.Load(file);
                         if (image != null)
                         {
+                            _mostRecentGlobal = file;
                             return new BackgroundResult(image);
                         }
                         break;
                     case ".mp4":
                     case ".mov":
                     case ".webm":
+                        _mostRecentGlobal = file;
                         return new BackgroundResult(BackgroundType.Video, File.OpenRead(file));
                     case ".yarground":
+                        _mostRecentGlobal = file;
                         return new BackgroundResult(BackgroundType.Yarground, File.OpenRead(file));
                     default:
                         filePaths.RemoveAt(index);

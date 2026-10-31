@@ -16,6 +16,16 @@ namespace YARG.Menu
         [SerializeField]
         private string _formatString = "N2";
 
+        /// <summary>
+        /// Allows changing the numeric display format at runtime (e.g. "F0" for
+        /// integer display on percentage sliders).
+        /// </summary>
+        public string FormatString
+        {
+            get => _formatString;
+            set => _formatString = value;
+        }
+
         [Space]
         public UnityEvent<float> ValueChanged;
 
@@ -39,6 +49,12 @@ namespace YARG.Menu
         {
             get => _slider.maxValue;
             set => _slider.maxValue = value;
+        }
+
+        public bool WholeNumbers
+        {
+            get => _slider.wholeNumbers;
+            set => _slider.wholeNumbers = value;
         }
 
         private string _beforeEditText;
@@ -137,10 +153,10 @@ namespace YARG.Menu
             if (setText)
                 _inputField.SetTextWithoutNotify(value.ToString(_formatString));
 
+            _isSettingValue = false;
+
             if (notify)
                 ValueChanged.Invoke(value);
-
-            _isSettingValue = false;
         }
 
         public void SetValueWithoutNotify(float value)

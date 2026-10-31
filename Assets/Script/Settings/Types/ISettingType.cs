@@ -8,7 +8,9 @@ namespace YARG.Settings.Types
         public Type ValueType { get; }
 
         public string AddressableName { get; }
+        public bool IsEditable { get; }
 
+        public void SetValueWithoutNotify(object value);
         public void ForceInvokeCallback();
         public bool ValueEquals(object obj);
     }
