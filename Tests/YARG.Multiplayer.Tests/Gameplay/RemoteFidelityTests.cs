@@ -19,8 +19,11 @@ using YARG.Multiplayer.Sync;
 namespace YARG.Multiplayer.Tests.Gameplay
 {
     /// <summary>
-    /// An engine fed through the network path (batcher, codec, remote buffer) must end with the same
-    /// stats as the engine that received the inputs directly.
+    /// Tests the input path (batcher, codec, remote buffer): the engine must receive exactly the inputs
+    /// that were sent, never in the past, and end with the same stats as an engine fed directly.
+    /// The "original" engine replays the Update times of the remote one because the Core's results depend
+    /// on the Update cadence (sustain ticks round per update); the authority over the final result is
+    /// the owner's Finished message, so live divergence of a few points is accepted.
     /// </summary>
     public class RemoteFidelityTests
     {
@@ -188,6 +191,8 @@ namespace YARG.Multiplayer.Tests.Gameplay
         private static List<double> RunRemote(BaseEngine engine, List<GameInput> inputs, double end)
         {
             var updates = new List<double>();
+            var queued = new List<(GameInput Input, double Previous, double Next)>();
+            double previousUpdate = double.NegativeInfinity;
             // Sender side: the same loop as the original, but inputs go through the batcher and codec.
             var batcher = new InputBatcher(1);
             var batches = new List<(double FlushTime, InputBatch Batch)>();
@@ -226,12 +231,14 @@ namespace YARG.Multiplayer.Tests.Gameplay
 
                 while (buffer.TryDequeue(target, out var input))
                 {
+                    queued.Add((input, previousUpdate, target));
                     engine.QueueInput(ref input);
                 }
                 if (target > engineTime)
                 {
                     engineTime = target;
                     updates.Add(target);
+                    previousUpdate = target;
                     engine.Update(target);
                 }
             }
@@ -242,10 +249,32 @@ namespace YARG.Multiplayer.Tests.Gameplay
             }
             while (buffer.TryDequeue(end + 1, out var input))
             {
+                queued.Add((input, previousUpdate, end + 1));
                 engine.QueueInput(ref input);
             }
             updates.Add(end + 1);
             engine.Update(end + 1);
+
+            // The engine got exactly what was sent, in the same order...
+            Assert.That(queued.Count, Is.EqualTo(inputs.Count), "Number of inputs delivered to the engine");
+            for (int i = 0; i < inputs.Count; i++)
+            {
+                var sent = inputs[i];
+                var got = queued[i].Input;
+                Assert.That(
+                    (got.Time, got.Action, got.Integer, got.Axis, got.Button),
+                    Is.EqualTo((sent.Time, sent.Action, sent.Integer, sent.Axis, sent.Button)),
+                    $"Input #{i}");
+            }
+
+            // ...and none of them was delivered in the past.
+            for (int i = 0; i < queued.Count; i++)
+            {
+                Assert.That(queued[i].Input.Time, Is.GreaterThanOrEqualTo(queued[i].Previous),
+                    $"Input #{i} is older than the previous engine update");
+                Assert.That(queued[i].Input.Time, Is.LessThanOrEqualTo(queued[i].Next),
+                    $"Input #{i} is newer than the update it was delivered for");
+            }
             return updates;
         }
 
@@ -288,9 +317,9 @@ namespace YARG.Multiplayer.Tests.Gameplay
         }
 
         [TestCaseSource(nameof(Instruments))]
-        public void Bot_RemoteMatchesOriginal(string instrument) => Compare(instrument, true);
+        public void Bot_RemoteMatchesOriginalAtSameCadence(string instrument) => Compare(instrument, true);
 
         [TestCaseSource(nameof(Instruments))]
-        public void Human_RemoteMatchesOriginal(string instrument) => Compare(instrument, false);
+        public void Human_RemoteInputPathIsLossless(string instrument) => Compare(instrument, false);
     }
 }

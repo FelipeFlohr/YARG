@@ -71,6 +71,7 @@ namespace YARG.Multiplayer.Tests.AutoTest
             var run = Play(30, 40);
 
             Assert.That(run.Notes.Count(n => n.Time >= 30 && n.Time <= 40), Is.GreaterThan(0));
+            Assert.That(run.HitTimes.Count(t => t < 30 || t > 40), Is.GreaterThan(0), "hits outside the window");
             Assert.That(run.HitTimes.Where(t => t >= 30 && t <= 40), Is.Empty);
         }
 
@@ -93,6 +94,25 @@ namespace YARG.Multiplayer.Tests.AutoTest
 
             Assert.That(inputs, Is.Not.Empty);
             Assert.That(inputs.Min(i => i.Time), Is.GreaterThanOrEqualTo(20));
+        }
+
+        [Test]
+        public void Generate_NotBefore_StillHitsAfterItAndOutsideTheWindow()
+        {
+            var run = Play(30, 40, 20);
+
+            Assert.That(run.HitTimes.Count(t => t > 20 && t < 30), Is.GreaterThan(0), "hits between notBefore and the window");
+            Assert.That(run.HitTimes.Count(t => t > 40), Is.GreaterThan(0), "hits after the window");
+            Assert.That(run.HitTimes.Where(t => t < 20), Is.Empty);
+        }
+
+        [Test]
+        public void Generate_NotBeforeInsideTheWindow_StillHitsFirstNoteAfterIt()
+        {
+            var run = Play(30, 40, 35);
+
+            var first = run.Notes.First(n => n.Time > 40);
+            Assert.That(run.HitTimes, Does.Contain(first.Time));
         }
 
         [Test]
