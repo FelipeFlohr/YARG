@@ -95,6 +95,11 @@ class CheckTests(unittest.TestCase):
         l = {"host": make_log(guit_hit=100), "bass": make_log(bot=1, remote=1, guit_hit=100)}
         self.assertTrue(any("scripted" in e for e in c.check(SCENARIO, l)))
 
+    def test_every_scripted_player_must_miss(self):
+        sc = dict(SCENARIO, expect={"muted": {"Guitar": {"from": 30, "to": 40}}, "scripted": ["Guit", "Bass"]})
+        errors = c.check(sc, logs())
+        self.assertEqual(errors, ["scripted player Bass hit 100/100, expected misses"])
+
     def test_bot_instance_must_log_bot_1(self):
         l = logs()
         l["bass"] = make_log(bot=0, remote=1)

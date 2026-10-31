@@ -113,13 +113,13 @@ def check(scenario, logs):
         if parsed[ref]["band"] is None:
             errors.append("%s: no Band line" % ref)
 
-        scripted = expect.get("scripted")
-        if scripted:
-            result = parsed[ref]["results"].get(scripted)
+        scripted = expect.get("scripted") or []
+        for player in [scripted] if isinstance(scripted, str) else scripted:
+            result = parsed[ref]["results"].get(player)
             if result is None:
-                errors.append("scripted player %s has no Result line" % scripted)
+                errors.append("scripted player %s has no Result line" % player)
             elif result[1] >= result[2]:
-                errors.append("scripted player %s hit %d/%d, expected misses" % (scripted, result[1], result[2]))
+                errors.append("scripted player %s hit %d/%d, expected misses" % (player, result[1], result[2]))
     return errors
 
 

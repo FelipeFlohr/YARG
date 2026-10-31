@@ -57,6 +57,28 @@ python3 Tests/MultiplayerBand/check_band_logs.py band4 "$HOME/yarg-mp-banda-runs
 Logs and settings go to `~/yarg-mp-banda-runs/<scenario>/<instance>/`; the checker reads `<instance>.log`. Run the
 scripts without `-I` (isolated mode drops the script folder from `sys.path`).
 
+Other scenarios: `same-instrument-both-miss` (two scripted guitarists whose misses overlap from 35 to 40 s),
+`pro-instruments` (pro guitar, pro bass, 4-lane drums), `fail-meter` (`NoFail` off) and `band8` (eight machines).
+No song in the test library has a 6-fret or elite drums chart, so those have no scenario.
+
+## Native runs (Windows, no Docker)
+
+On a machine with a GPU, `--native` runs the instances as plain processes, which is much faster than software
+rendering in Docker. On Windows the build step above makes a Windows player (`YARG.exe`), since the editor builds for
+the platform it runs on:
+
+```bash
+"$UNITY_EDITOR" -batchmode -nographics -projectPath "$(cygpath -w "$PWD")" -buildTarget Win64 \
+  -executeMethod Editor.MultiplayerTestBuild.Build -mpBuildOutput "$HOME/yarg-build-mp-banda" -logFile unity-build.log
+```
+
+```bash
+YARG_MP_SONGS='C:\Users\me\Desktop\Musicas' python Tests/MultiplayerBand/run_scenario.py band4 --native
+```
+
+Each instance opens a small window. The game's sound is off (`MasterMusicVolume` 0) unless `--audible` is passed.
+`--game`, `--songs` and `--host-wait` override the build, the host's song folder and the wait before the first client.
+
 Checker unit tests (standard library only):
 
 ```bash
