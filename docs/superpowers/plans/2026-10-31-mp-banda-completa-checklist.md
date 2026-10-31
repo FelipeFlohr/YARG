@@ -19,18 +19,21 @@ eventos se agrupam no mesmo `song=`.
 |---|---|---|---|---|
 | `same-instrument` | Soliloquy | PASS | 4 min | `python3 run_scenario.py same-instrument` |
 | `no-stems` | Making Memories | PASS | 4,5 min | `python3 run_scenario.py no-stems` |
-| `band4` | Soliloquy | PASS na build c1108023; **FAIL** na build final, só por `UNMUTE_SLACK` (ver abaixo) | 5,6 min | `python3 run_scenario.py band4` |
-| `keys` | Subdivisions | PASS (2ª execução, build c1108023); **FAIL** na build final, só por `UNMUTE_SLACK` | 8,3 min | `python3 run_scenario.py keys` |
+| `band4` | Soliloquy | PASS na build c1108023; **FAIL** nas 3 execuções da build final, só pela folga de desmute/mute remoto (ver abaixo) | 5,7 min | `python3 run_scenario.py band4` |
+| `keys` | Subdivisions | PASS (build final, 1ª tentativa) | 8,3 min | `python3 run_scenario.py keys` |
 
-**Rodada de correção (revisão 1).** Depois dos commits da revisão (vocal em Expert, fim de sustain por traste,
-`MULTIPLAYER_FINISH_TIMEOUT` de 15 s) `same-instrument` e `no-stems` passaram de novo. `band4` falhou 4 vezes seguidas e
-`keys` 1 vez com a mesma e única reprovação: `stem Guitar did not come back to 1.00 by 45.0` (band4) e `by 75.0` (keys).
-Pontuações e `Band:` ficaram iguais em todas as máquinas, o mute aconteceu nas máquinas remotas dentro da janela, e o
-desmute veio, mas com 0,3 s a 4 s além do limite (janela + 5 s). Durante essas execuções o load average da máquina estava em
-20 a 25 por causa de outras sessões do Claude (`uptime`), contra um load baixo na execução que passou. Não afrouxei a
-tolerância; repetir quando a máquina estiver livre deve passar (como passou antes), mas isto **não foi demonstrado na
-build final**. Tempos (mute/desmute) da última execução: band4 host 33.81/42.76, bass 39.57/47.64, drums 39.69/44.18,
-vocals 40.96/49.22; keys guitar 60.29/71.82, host 61.02/75.27, prokeys 62.57/76.49.
+**Rodada de correção 2 (build final, `YARG.Core` com o conserto do bot de vocal).** `keys`: OK na 1ª tentativa. `band4`: 3
+tentativas, todas reprovadas só por tempo (as pontuações e o `Band:` ficaram iguais nas 4 máquinas, o vocal fez 14/14):
+- tentativa 1: desmute remoto em 47,12 a 49,39 (limite 45,0); tentativa 2: só o vocals, 48,51; tentativa 3: drums 45,42 e o
+  vocals só mutou em 42,87 (limite de mute 42,0).
+- load average de 1 min logo antes de cada execução: band4 2,77 / 4,42 / 4,28 e keys 4,62 (a máquina estava livre). Logo depois:
+  29,39 / 26,67 / 28,88 e 22,70. **O load de 23 a 29 vem da própria execução** (4 instâncias com render por software em 4
+  núcleos); corrijo a explicação anterior de que eram outras sessões, que não se sustenta com esses números.
+- Conclusão: a defasagem do relógio de música entre as instâncias (vários segundos) é própria deste harness e a folga de 5 s/2 s do
+  verificador fica no limite com 4 instâncias; com 2 ou 3 passa. Não afrouxei a regra. `band4` continua FAIL aqui.
+- Tempos (mute/desmute) por tentativa. 1: host 34.48/42.23, bass 40.44/47.74, drums 41.42/49.39, vocals 39.58/47.12. 2: host
+  31.74/41.61, bass 34.66/44.15, drums 35.93/43.38, vocals 34.93/48.51. 3: host 34.36/41.90, bass 39.70/44.46, drums 40.90/45.42,
+  vocals 42.87/45.57. `keys`: guitar 61.62/70.08, host 64.27/72.19, prokeys 64.71/72.84.
 
 `keys` falhou na 1ª execução por 0,15 s: o desmute chegou na máquina `prokeys` em `song=75.15` e o verificador exige
 até 75.0 (janela 60-70 + 5 s de folga). O verificador não foi mexido; repeti o cenário e passou (desmute em 74.61). A
@@ -40,9 +43,9 @@ folga de 5 s está perto do limite nesta máquina (ver "Preocupações").
 
 - [x] `same-instrument`: host e `guit2` com as mesmas duas linhas `Result:` e `Band: score=208533 stars=5`.
 - [x] `no-stems`: `Band: score=584042 stars=5` nas duas.
-- [x] `band4`: `Band: score=354202 stars=4` nas quatro (host, bass, drums, vocals), com `Result:` de Guit, Bass, Drum
+- [x] `band4`: `Band: score=505724 stars=5` nas quatro (host, bass, drums, vocals), com `Result:` de Guit, Bass, Drum
   e Voc iguais nas quatro (última execução, build final).
-- [x] `keys`: `Band: score=1493557 stars=5` nas três (última execução) (host, guitar, prokeys), com `Result:` de Keys, Guit e ProKeys
+- [x] `keys`: `Band: score=1487405 stars=5` nas três (build final) (host, guitar, prokeys), com `Result:` de Keys, Guit e ProKeys
   iguais nas três.
 
 O verificador compara todas as linhas `Result:` (pontuação, acertos/total) e `Band:` entre as máquinas.
@@ -88,7 +91,7 @@ O verificador compara todas as linhas `Result:` (pontuação, acertos/total) e `
 - [x] `Playing as ... bot=1` nos clientes bot (o verificador exige `bot=1`):
   - `same-instrument` `guit2`: `Playing as Guit2 bot=1 instrument=FiveFretGuitar difficulty=Expert`
   - `no-stems` `drums`: `Playing as Drum bot=1 instrument=ProDrums difficulty=Expert`
-  - `band4`: `Bass bot=1 FiveFretBass`, `Drum bot=1 FiveLaneDrums`, `Voc bot=1 Vocals difficulty=Beginner`
+  - `band4`: `Bass bot=1 FiveFretBass`, `Drum bot=1 FiveLaneDrums`, `Voc bot=1 Vocals difficulty=Expert`
   - `keys`: `Keys bot=1 Keys` (host), `ProKeys bot=1 ProKeys`
   - O guitarrista scripted aparece como `bot=0` em todos os cenários.
 
@@ -97,14 +100,12 @@ O verificador compara todas as linhas `Result:` (pontuação, acertos/total) e `
 - [x] Guitarra 5 trastes (humano scripted e bot), baixo 5 trastes, bateria (ProDrums em Making Memories, cinco
   lanes em Soliloquy), teclado e pro keys: cada um tocou uma partida inteira como jogador remoto em pelo
   menos uma máquina, com pontuação igual em todas.
-- [ ] **Vocal: NÃO verificado como "toca".** O bot de vocal (agora em Expert) entra, é replicado e fecha com pontuação
-  igual nas máquinas, mas faz `hit=0/14` (pontuação 79 a 911, varia). Causa (investigada com o engine isolado, teste
-  `VocalBotTests`): o bot de vocal só canta nos `Update` que o jogo dá a ele. O Core deveria enfileirar atualizações
-  extras para o bot, mas `VocalsEngine.GenerateQueuedUpdates` (`YARG.Core/YARG.Core/Engine/Vocals/VocalsEngine.cs:121`) calcula
-  `nextUpdateIndex * ApproximateVocalFps` em vez de `nextUpdateIndex * timeForFrame` (linha 119), então o laço da linha 123
-  nunca roda. A 60 atualizações por segundo o bot acerta 14/14 frases no Soliloquy (30/30 no chart de teste); a 10 por
-  segundo, 0/14 (2/30); a 1 por segundo, 0/N. No harness o jogo roda a menos de 1 quadro por segundo (3 a 4 instâncias,
-  GL por software), por isso 0/14. É comportamento do Core (não alterado), não da sincronização do fork.
+- [x] Vocal: o bot toca. Com o conserto do Core (abaixo) o `band4` mostra `Result: Voc ... score=124000 hit=14/14` nas 4 máquinas
+  (3 execuções), contra `hit=0/14` antes. Causa do 0/14 anterior: `VocalsEngine.GenerateQueuedUpdates`
+  (`YARG.Core/YARG.Core/Engine/Vocals/VocalsEngine.cs:121`) calculava `nextUpdateIndex * ApproximateVocalFps` em vez de
+  `* timeForFrame`, então o laço que simula as entradas do bot nunca rodava e ele só cantava nos `Update` do jogo (a menos de 1
+  quadro/s no harness, 0 acertos). Conserto no submódulo, branch `claude/mp-banda-completa`, commit `0774fba`, com teste
+  `Bot_HitsEveryPhrase_RegardlessOfTheUpdateRate` (60, 10 e 1 atualização/s; reprovava a 10 e 1 antes).
 
 ## Ajustes e bugs achados rodando
 
@@ -131,14 +132,15 @@ jogador scripted (mutes de sustain que um jogador de verdade não teria).
 - Áudio audível (PCM nulo): só os eventos de volume do stem foram lidos.
 - Render na GPU real (llvmpipe), e qualquer coisa visual (pista remota, HUD, tela de resultados).
 - Fail meter ligado (`NoFail: 1` em todas as instâncias).
-- Vocal tocando de verdade (o bot faz 0/14 frases no harness, ver acima).
-- `band4` e `keys` passando na build final (reprovados só pela folga de desmute com a máquina em load 20 a 25).
+- Vocal com cantor de verdade (só o bot, que faz 14/14).
+- `band4` passando na build final (reprovado só pelos limites de tempo do verificador; ver acima).
 - Os dois jogadores da mesma parte errando juntos (só coberto por testes do núcleo).
 - Dois humanos de verdade no mesmo instrumento; vocal com cantor de verdade.
 
 ## Preocupações
 
-- A folga de 5 s do desmute (`UNMUTE_SLACK`) reprovou `keys` uma vez (por 0,15 s) e, na build final com a máquina ocupada, `band4` e `keys`. O atraso vem de quadros lentos de
+- Com 4 instâncias neste PC os limites de tempo do verificador (mute até janela+2 s, desmute até janela+5 s) são violados por até 4 s
+  no `band4`; `keys` (3 instâncias) passou. Não afrouxei os limites. O atraso vem de quadros lentos de
   instâncias disputando 4 núcleos com render por software; numa máquina real o atraso é menor.
 - Pontuações mudam um pouco de uma execução para outra (por exemplo, o bot de teclado), mas são iguais entre as
   máquinas na mesma execução.
