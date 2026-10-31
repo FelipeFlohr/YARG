@@ -7,6 +7,7 @@ using YARG.Core.Song;
 using YARG.Localization;
 using YARG.Menu;
 using YARG.Menu.Dialogs;
+using YARG.Menu.DifficultySelect;
 using YARG.Menu.MusicLibrary;
 using YARG.Menu.Navigation;
 using YARG.Menu.Persistent;
@@ -123,7 +124,7 @@ namespace YARG.Multiplayer
             {
                 foreach (var difficulty in EnumExtensions<Difficulty>.Values)
                 {
-                    if (!song[instrument][difficulty])
+                    if (!PartDifficulty.HasPlayableDifficulty(song, instrument, difficulty))
                     {
                         continue;
                     }

@@ -54,8 +54,9 @@ Não dá para jogar nem inspecionar visualmente aqui. Mudanças visuais (cenas, 
 Partidas online podem ser testadas sem ninguém no teclado com `-mp-autotest` (ver `Assets/Script/Multiplayer/MultiplayerAutoTest.cs`; o resultado sai no log como `[AutoTest] PASS`/`FAIL` e no exit code). Use `-persistent-data-path` distinto por instância:
 
 ```text
-YARG -persistent-data-path <host>    -mp-autotest host [-mp-song nome] [-mp-rounds n] [-mp-leave-after s]
+YARG -persistent-data-path <host>    -mp-autotest host [-mp-song nome] [-mp-rounds n] [-mp-players n] [-mp-leave-after s]
 YARG -persistent-data-path <cliente> -mp-autotest join 127.0.0.1 [-mp-leave-after s | -mp-expect-leave]
+`-mp-players n` (host, padrão 2) é quantos jogadores o host espera antes de começar a rodada.
 extras (host/join): [-mp-profile nome] [-mp-instrument Instrument] [-mp-difficulty Difficulty] [-mp-bot 0|1] [-mp-miss de-até]
 YARG -persistent-data-path <dados>   -mp-autotest offline <jogadores>
 ```

@@ -9,6 +9,7 @@ using YARG.Core.Logging;
 using YARG.Core.Audio;
 using YARG.Core.Game;
 using YARG.Core.Song;
+using YARG.Menu.DifficultySelect;
 using YARG.Menu.ScoreScreen;
 using YARG.Multiplayer.AutoTest;
 using YARG.Multiplayer.Protocol;
@@ -20,7 +21,8 @@ namespace YARG.Multiplayer
 {
     /// <summary>
     /// Plays online matches without anybody at the keyboard, for testing two instances on one machine:
-    /// <c>-mp-autotest host [-mp-song name] [-mp-rounds n]</c> or <c>-mp-autotest join address</c>.
+    /// <c>-mp-autotest host [-mp-song name] [-mp-rounds n] [-mp-players n]</c> or <c>-mp-autotest join address</c>
+    /// (<c>-mp-players n</c>, default 2, is how many players the host waits for before starting the round).
     /// By default the local profile is turned into a bot; extra arguments choose the part and the player instead:
     /// <c>-mp-profile name</c> (find or create the profile), <c>-mp-instrument Instrument</c>, <c>-mp-difficulty Difficulty</c>,
     /// <c>-mp-bot 0|1</c> (saved in the profile) and <c>-mp-miss from-to</c> (a human five-fret guitarist driven by a script
@@ -274,19 +276,6 @@ namespace YARG.Multiplayer
             return true;
         }
 
-        /// <summary>
-        /// Vocal parts have a single chart: their byte in the song's part values holds the sub-track mask,
-        /// not a difficulty mask (<c>song[Vocals][Beginner]</c> only means "has lead vocals"), so any difficulty is valid.
-        /// </summary>
-        private static bool HasDifficulty(SongEntry song, Instrument instrument, Difficulty difficulty)
-        {
-            if (instrument is Instrument.Vocals or Instrument.Harmony or Instrument.PartyVocals)
-            {
-                return song.HasInstrument(instrument);
-            }
-            return song[instrument][difficulty];
-        }
-
         /// <returns>False only when the requested instrument isn't in the song.</returns>
         private static bool PickPart(IMultiplayerSession session, SongEntry song)
         {
@@ -306,7 +295,7 @@ namespace YARG.Multiplayer
                     : EnumExtensions<Difficulty>.Values.Reverse().ToArray();
                 foreach (var difficulty in difficulties)
                 {
-                    if (HasDifficulty(song, wanted, difficulty))
+                    if (PartDifficulty.HasPlayableDifficulty(song, wanted, difficulty))
                     {
                         profile.CurrentInstrument = wanted;
                         profile.CurrentDifficulty = difficulty;
@@ -316,7 +305,7 @@ namespace YARG.Multiplayer
                     }
                 }
                 Log($"FAIL: {wanted} has no requested difficulty chart; difficulties: " +
-                    string.Join(", ", EnumExtensions<Difficulty>.Values.Where(d => HasDifficulty(song, wanted, d))));
+                    string.Join(", ", EnumExtensions<Difficulty>.Values.Where(d => PartDifficulty.HasPlayableDifficulty(song, wanted, d))));
                 return false;
             }
 
@@ -324,7 +313,7 @@ namespace YARG.Multiplayer
             {
                 foreach (var difficulty in EnumExtensions<Difficulty>.Values.Reverse())
                 {
-                    if (HasDifficulty(song, instrument, difficulty))
+                    if (PartDifficulty.HasPlayableDifficulty(song, instrument, difficulty))
                     {
                         profile.CurrentInstrument = instrument;
                         profile.CurrentDifficulty = difficulty;
@@ -657,7 +646,8 @@ namespace YARG.Multiplayer
                 var profile = player.Profile;
                 var instrument = profile.GameMode.PossibleInstrumentsForSong(song).First();
                 profile.CurrentInstrument = instrument;
-                profile.CurrentDifficulty = EnumExtensions<Difficulty>.Values.Reverse().First(d => song[instrument][d]);
+                profile.CurrentDifficulty = EnumExtensions<Difficulty>.Values.Reverse()
+                    .First(d => PartDifficulty.HasPlayableDifficulty(song, instrument, d));
                 Log($"Offline player {profile.Name}: {profile.CurrentInstrument} {profile.CurrentDifficulty}");
             }
 
