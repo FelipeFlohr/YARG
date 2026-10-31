@@ -12,6 +12,7 @@ using YARG.Helpers;
 using YARG.Menu.Filters;
 using YARG.Settings.Metadata;
 using YARG.Settings.Types;
+using YARG.Settings.Web;
 
 namespace YARG.Settings
 {
@@ -99,6 +100,12 @@ namespace YARG.Settings
                 nameof(Settings.SaveMultiplayerSongs),
                 new ButtonRowMetadata(nameof(Settings.ChooseMultiplayerSongsFolder)),
                 nameof(Settings.MultiplayerRemoteDelayMs),
+
+                new HeaderMetadata("WebConfig", visibleWhen: () => PlatformInfo.IsWeb),
+                new ButtonRowMetadata(
+                    () => PlatformInfo.IsWeb,
+                    nameof(Settings.ExportConfig),
+                    nameof(Settings.ImportConfig)),
             },
             new SongManagerTab("SongManager", icon: "Songs")
             {
@@ -324,6 +331,8 @@ namespace YARG.Settings
 
         private static string SettingsFile => Path.Combine(PathHelper.PersistentDataPath, "settings.json");
 
+        internal static string SettingsFilePath => SettingsFile;
+
         public static void LoadStartupSettings()
         {
             try
@@ -402,6 +411,7 @@ namespace YARG.Settings
                 var json = JObject.Parse(JsonConvert.SerializeObject(Settings, JsonSettings));
                 SettingsMigration.SetCurrentSchemaVersion(json);
                 File.WriteAllText(SettingsFile, json.ToString(Formatting.Indented));
+                WebConfigStore.Persist(WebConfigFile.Settings);
             }
         }
 

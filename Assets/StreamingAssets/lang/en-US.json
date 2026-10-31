@@ -1200,7 +1200,8 @@
             "Accessibility": "Accessibility",
             "CareerInformation": "Career Information",
             "CareerTiers": "Career Tiers",
-            "NoTiers": "  (No tiers created. Click '+ Add Tier' above)"
+            "NoTiers": "  (No tiers created. Click '+ Add Tier' above)",
+            "WebConfig": "Settings Backup"
         },
         "Button": {
             "ChooseMultiplayerSongsFolder": "Choose Downloaded Songs Folder",
@@ -1217,7 +1218,9 @@
             "OpenExecutablePath": "Open Executable Path",
             "OpenPersistentDataPath": "Open Persistent Data Path",
             "RemoveRemoteContent": "Remove Cached Content",
-            "OpenAsioControlPanel": "Open ASIO Control Panel"
+            "OpenAsioControlPanel": "Open ASIO Control Panel",
+            "ExportConfig": "Export Settings and Profiles",
+            "ImportConfig": "Import Settings and Profiles"
         },
         "Setting": {
             "SaveMultiplayerSongs": {
@@ -2816,5 +2819,9 @@
                 }
 			}
         }
+    },
+    "Web": {
+        "ConfigNotSaved": "Your browser is blocking storage. Settings will not be saved.",
+        "ImportInvalid": "That file is not a YARG settings backup."
     }
 }

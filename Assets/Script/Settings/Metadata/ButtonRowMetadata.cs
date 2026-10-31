@@ -20,6 +20,18 @@ namespace YARG.Settings.Metadata
             Buttons = new[] { button };
         }
 
+        public ButtonRowMetadata(Func<bool> visibleWhen, params string[] buttons)
+            : base(visibleWhen)
+        {
+            UnlocalizedSearchNames = new string[buttons.Length];
+            for (int i = 0; i < buttons.Length; i++)
+            {
+                UnlocalizedSearchNames[i] = $"Button.{buttons[i]}";
+            }
+
+            Buttons = buttons;
+        }
+
         public ButtonRowMetadata(params string[] buttons)
         {
             UnlocalizedSearchNames = new string[buttons.Length];

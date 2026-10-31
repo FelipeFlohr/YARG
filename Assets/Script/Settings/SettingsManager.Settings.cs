@@ -27,6 +27,7 @@ using YARG.Player;
 using YARG.Scores;
 using YARG.Settings.Metadata;
 using YARG.Settings.Types;
+using YARG.Settings.Web;
 using YARG.Song;
 using YARG.Song.Exporters;
 using YARG.Venue;
@@ -748,6 +749,17 @@ namespace YARG.Settings
             public void OpenPersistentDataPath()
             {
                 FileExplorerHelper.OpenFolder(PathHelper.PersistentDataPath);
+            }
+
+            public void ExportConfig()
+            {
+                WebConfigTransfer.Export();
+            }
+
+            public void ImportConfig()
+            {
+                // Must stay synchronous: the file picker needs the click's user activation
+                WebConfigTransfer.Import();
             }
 
             public void OpenExecutablePath()

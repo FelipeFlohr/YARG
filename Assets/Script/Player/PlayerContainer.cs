@@ -20,6 +20,7 @@ using YARG.Menu.Filters;
 using YARG.Menu.Persistent;
 using YARG.Menu.ProfileList;
 using YARG.Settings;
+using YARG.Settings.Web;
 using YARG.Song;
 
 namespace YARG.Player
@@ -34,6 +35,7 @@ namespace YARG.Player
     {
         public  static string ProfilesDirectory => Path.Combine(PathHelper.PersistentDataPath, "profiles");
         private static string ProfilesPath      => Path.Combine(ProfilesDirectory, "profiles.json");
+        internal static string ProfilesFilePath => ProfilesPath;
         private static string ProfilesBackupPath => Path.Combine(ProfilesDirectory, "profiles.json.bak");
         private static string UnloadedProfilesPath => Path.Combine(ProfilesDirectory, "profiles.json.unloaded");
 
@@ -758,6 +760,7 @@ namespace YARG.Player
             }
 
             File.Move(tempPath, ProfilesPath);
+            WebConfigStore.Persist(WebConfigFile.Profiles);
 
             BindingsContainer.SaveBindings();
 

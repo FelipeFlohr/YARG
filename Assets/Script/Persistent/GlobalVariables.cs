@@ -18,6 +18,7 @@ using YARG.Replays;
 using YARG.Scores;
 using YARG.Settings;
 using YARG.Settings.Customization;
+using YARG.Settings.Web;
 
 namespace YARG
 {
@@ -84,6 +85,7 @@ namespace YARG
 
             // Initialize important classes
 
+            WebConfigStore.Restore();
             ReplayContainer.Init();
             ScoreContainer.Init();
             PlaylistContainer.Initialize();
