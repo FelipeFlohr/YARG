@@ -26,7 +26,7 @@ BASE_SETTINGS = {
 
 def docker_command(name, run_dir, stagger):
     gids = [os.stat(p).st_gid for p in ("/dev/dri/renderD128", "/dev/dri/card0", "/dev/snd/seq")]
-    cmd = ["timeout", "1500", "docker", "run", "--rm", "--name", "yarg-test-" + name, "--network", "none",
+    cmd = ["timeout", "-k", "30", "1500", "docker", "run", "--init", "--rm", "--name", "yarg-test-" + name, "--network", "none",
            "--device", "/dev/dri", "--device", "/dev/snd/seq"]
     for g in gids:
         cmd += ["--group-add", str(g)]
@@ -63,6 +63,8 @@ def main(argv=None):
         print(" ".join(shlex.quote(c) for c in cmd))
         return 0
 
+    subprocess.call(["docker", "rm", "-f", "yarg-test-" + args.scenario],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     prepare(args.scenario, run_dir)
     code = subprocess.call(cmd)
     print("container exit code: %d" % code)

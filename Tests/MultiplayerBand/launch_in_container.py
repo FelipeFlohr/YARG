@@ -47,12 +47,17 @@ def main(argv=None):
             procs.append((inst["name"], subprocess.Popen(command(scenario, inst), env=env)))
 
         deadline = time.time() + TOTAL_TIMEOUT
-        while time.time() < deadline and any(p.poll() is None for _, p in procs):
-            time.sleep(1)
         ok = True
+        while time.time() < deadline and any(p.poll() is None for _, p in procs):
+            failed = [n for n, p in procs if p.poll() not in (None, 0)]
+            if failed:
+                print("%s failed, killing the others" % ", ".join(failed), flush=True)
+                ok = False
+                break
+            time.sleep(1)
         for name, p in procs:
             if p.poll() is None:
-                print("timeout, killing " + name, flush=True)
+                print("killing " + name, flush=True)
                 p.kill()
                 p.wait()
                 ok = False

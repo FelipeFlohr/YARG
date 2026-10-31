@@ -64,6 +64,9 @@ def _check_stems(name, info, muted, errors):
     for stem, window in muted.items():
         events = by_stem.get(stem, [])
         lo, hi = window["from"], window["to"]
+        first_zero = next((song for fraction, song in events if fraction == 0.0), None)
+        if first_zero is not None and not (lo <= first_zero <= hi + MUTE_SLACK):
+            errors.append("%s: stem %s first muted at %s, outside %s..%s" % (name, stem, first_zero, lo, hi + MUTE_SLACK))
         mute_at = None
         for i, (fraction, song) in enumerate(events):
             if fraction == 0.0 and lo <= song <= hi + MUTE_SLACK:

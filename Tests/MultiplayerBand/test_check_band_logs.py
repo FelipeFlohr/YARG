@@ -95,6 +95,13 @@ class CheckTests(unittest.TestCase):
         self.assertEqual(c.check(sc, {"host": make_log(stems=[])}), [])
         self.assertTrue(c.check(sc, {"host": make_log()}))
 
+    def test_fails_on_spurious_mute_before_window(self):
+        stems = [("Guitar", "0.00", "10.00"), ("Guitar", "1.00", "11.00"),
+                 ("Guitar", "0.00", "30.50"), ("Guitar", "1.00", "40.60")]
+        l = logs()
+        l["host"] = make_log(stems=stems)
+        self.assertTrue(any("host" in e and "outside" in e for e in c.check(SCENARIO, l)))
+
 
 if __name__ == "__main__":
     unittest.main()
