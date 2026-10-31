@@ -12,6 +12,7 @@ using YARG.Core.Engine.Keys.Engines;
 using YARG.Core.Engine.Vocals.Engines;
 using YARG.Core.Game;
 using YARG.Core.Input;
+using YARG.Multiplayer.AutoTest;
 using YARG.Multiplayer.Protocol;
 using YARG.Multiplayer.Sync;
 
@@ -60,7 +61,7 @@ namespace YARG.Multiplayer.Tests.Gameplay
                     {
                         Engine = new YargFiveFretGuitarEngine(notes, chart.SyncTrack, parms, isBot),
                         End = notes.GetEndTime(),
-                        Human = RandomGuitarInputs,
+                        Human = (_, _) => ScriptedFiveFretInputs.Generate(notes.Notes, 30, 40),
                     };
                 }
                 case "ProDrums":
@@ -104,28 +105,6 @@ namespace YARG.Multiplayer.Tests.Gameplay
                 }
             }
             throw new ArgumentException(instrument);
-        }
-
-        private static readonly GuitarAction[] Frets =
-            { GuitarAction.Fret1, GuitarAction.Fret2, GuitarAction.Fret3, GuitarAction.Fret4, GuitarAction.Fret5 };
-
-        private static List<GameInput> RandomGuitarInputs(Random random, double end)
-        {
-            var list = new List<GameInput>();
-            for (double t = 0; t < end; t += Step)
-            {
-                int roll = random.Next(4);
-                if (roll == 0)
-                {
-                    list.Add(GameInput.Create(t, Frets[random.Next(Frets.Length)], random.Next(2) == 0));
-                }
-                else if (roll == 1)
-                {
-                    list.Add(GameInput.Create(t, GuitarAction.StrumDown, true));
-                    list.Add(GameInput.Create(t + 0.02, GuitarAction.StrumDown, false));
-                }
-            }
-            return list.OrderBy(i => i.Time).ToList();
         }
 
         private static List<GameInput> RandomDrumInputs(Random random, double end)
