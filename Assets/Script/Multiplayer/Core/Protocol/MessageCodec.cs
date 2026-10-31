@@ -96,6 +96,7 @@ namespace YARG.Multiplayer.Protocol
                 case PlayerSetup m:
                     writer.Write(m.PlayerId);
                     WriteBytes(writer, m.Frame);
+                    writer.Write(m.IsBot);
                     break;
                 case InputBatch m:
                     writer.Write(m.PlayerId);
@@ -217,7 +218,8 @@ namespace YARG.Multiplayer.Protocol
                 case MessageType.ReturnToLobby:
                     return new ReturnToLobby();
                 case MessageType.PlayerSetup:
-                    return new PlayerSetup(reader.ReadInt32(), ReadBytes(reader, ProtocolInfo.MaxMessageSize));
+                    return new PlayerSetup(reader.ReadInt32(), ReadBytes(reader, ProtocolInfo.MaxMessageSize),
+                        reader.ReadBoolean());
                 case MessageType.InputBatch:
                 {
                     int playerId = reader.ReadInt32();

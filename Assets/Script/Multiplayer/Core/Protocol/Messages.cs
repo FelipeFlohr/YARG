@@ -235,10 +235,17 @@ namespace YARG.Multiplayer.Protocol
         public int    PlayerId { get; }
         public byte[] Frame    { get; }
 
-        public PlayerSetup(int playerId, byte[] frame)
+        /// <summary>
+        /// Profiles don't serialize the bot flag (replays never needed it), but a bot sends no inputs,
+        /// so the other machines have to run it as a bot too.
+        /// </summary>
+        public bool IsBot { get; }
+
+        public PlayerSetup(int playerId, byte[] frame, bool isBot)
         {
             PlayerId = playerId;
             Frame = frame;
+            IsBot = isBot;
         }
     }
 

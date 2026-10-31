@@ -2,7 +2,7 @@ namespace YARG.Multiplayer
 {
     public static class ProtocolInfo
     {
-        public const ushort Version = 1;
+        public const ushort Version = 2;
         public const int DefaultPort = 7676;
 
         public const int MaxMessageSize = 1024 * 1024;

@@ -332,6 +332,11 @@ namespace YARG.Gameplay
             BeatEventHandler.Update(_songRunner.SongTime, _songRunner.VisualTime);
             CrowdEventHandler?.Update(_songRunner.SongTime);
 
+            if (MultiplayerGameplay.IsInMatch)
+            {
+                DropOutRemotePlayersWhoLeft();
+            }
+
             // Update players
             int totalScore = 0;
             foreach (var player in _players)
@@ -717,6 +722,23 @@ namespace YARG.Gameplay
 
             ShowResults();
             return true;
+        }
+
+        /// <summary>
+        /// A remote player who left would otherwise stay on screen with a frozen track.
+        /// </summary>
+        private void DropOutRemotePlayersWhoLeft()
+        {
+            foreach (var player in _players)
+            {
+                if (player is TrackPlayer track && track.IsActive && player.Player.IsRemote &&
+                    MultiplayerGameplay.HasLeft(player.Player.RemotePlayerId))
+                {
+                    YargLogger.LogFormatInfo("Remote player {0} left, dropping their track out",
+                        player.Player.Profile.Name);
+                    track.DropOut();
+                }
+            }
         }
 
         private async UniTaskVoid EndMultiplayerSong()

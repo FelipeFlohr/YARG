@@ -47,7 +47,7 @@ namespace YARG.Multiplayer.Tests.Protocol
             yield return new Loaded();
             yield return new StartAt(103.0);
             yield return new ReturnToLobby();
-            yield return new PlayerSetup(1, new byte[] { 1, 2, 3, 4 });
+            yield return new PlayerSetup(1, new byte[] { 1, 2, 3, 4 }, isBot: true);
             yield return new InputBatch(2, 1.6, new[] { new GameInput(1.25, 3, 1) });
             yield return new StatsCheckpoint(1, new byte[] { 9 });
             yield return new Finished(1, new byte[] { 8, 7 });

@@ -101,7 +101,8 @@ namespace YARG.Multiplayer
 
         public static void SendSetup(BasePlayer localPlayer)
         {
-            _session?.SendGameMessage(new PlayerSetup(_session.LocalPlayerId, EncodeFrame(localPlayer)));
+            _session?.SendGameMessage(new PlayerSetup(_session.LocalPlayerId, EncodeFrame(localPlayer),
+                localPlayer.Player.Profile.IsBot));
         }
 
         /// <summary>
@@ -208,7 +209,9 @@ namespace YARG.Multiplayer
                 switch (message)
                 {
                     case PlayerSetup m:
-                        _setups[m.PlayerId] = ReplayFrameCodec.Decode(m.Frame);
+                        var setup = ReplayFrameCodec.Decode(m.Frame);
+                        setup.Profile.IsBot = m.IsBot;
+                        _setups[m.PlayerId] = setup;
                         break;
                     case InputBatch m:
                         GetBuffer(m.PlayerId)?.AddBatch(m);
@@ -247,9 +250,12 @@ namespace YARG.Multiplayer
                 .Select(player => player.PlayerId);
         }
 
-        private static bool HasLeft(int playerId)
+        /// <summary>
+        /// Whether a remote player left the session (or was never in it).
+        /// </summary>
+        public static bool HasLeft(int playerId)
         {
-            return _session.Players.All(player =>
+            return _session != null && _session.Players.All(player =>
                 player.PlayerId != playerId || player.Status == LobbyPlayerStatus.Left);
         }
 
