@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using DG.Tweening;
@@ -5,6 +6,8 @@ using DG.Tweening.Core;
 using DG.Tweening.Plugins.Options;
 using UnityEngine;
 using YARG.Core.Audio;
+using YARG.Multiplayer;
+using YARG.Multiplayer.Audio;
 using YARG.Settings;
 
 namespace YARG.Gameplay
@@ -12,37 +15,22 @@ namespace YARG.Gameplay
     public partial class GameManager
     {
         private const double DEFAULT_VOLUME = 1.0;
+
+        /// <summary>
+        /// Participant id used by the crowd handler, which is not a player. Player ids are never negative.
+        /// </summary>
+        public const int CROWD_PARTICIPANT_ID = -1;
+
         public class StemState
         {
             private SongStem _stem;
             public double Volume => GetVolumeSetting();
-            public int Total;
-            public int Audible;
             public int ReverbCount;
             public float WhammyPitch;
 
             public StemState(SongStem stem)
             {
                 _stem = stem;
-            }
-
-            public double SetMute(bool muted, bool keepAudibleUntilAllMiss)
-            {
-                if (muted)
-                {
-                    --Audible;
-                }
-                else if (Audible < Total)
-                {
-                    ++Audible;
-                }
-
-                if (keepAudibleUntilAllMiss)
-                {
-                    return Audible > 0 ? Volume : 0;
-                }
-
-                return Volume * Audible / Total;
             }
 
             public bool SetReverb(bool reverb)
@@ -90,6 +78,7 @@ namespace YARG.Gameplay
         }
 
         private readonly Dictionary<SongStem, StemState>        _stemStates = new();
+        private          StemMuteTracker                        _stemMutes = new();
         private          SongStem                               _backgroundStem;
         private          TweenerCore<double, double, NoOptions> _volumeTween;
 
@@ -100,6 +89,7 @@ namespace YARG.Gameplay
                 (!isReplay && SettingsManager.Settings.CensorMatureContent.Value);
 
             _stemStates.Clear();
+            _stemMutes = new StemMuteTracker();
             _mixer = Song.LoadAudio(GlobalVariables.State.SongSpeed, DEFAULT_VOLUME, censorAudio);
             if (_mixer == null)
             {
@@ -124,7 +114,12 @@ namespace YARG.Gameplay
                 StarPowerActivations = 0;
         }
 
-        public void ChangeStemMuteState(SongStem stem, bool muted, float duration = 0.0f)
+        /// <summary>
+        /// Raised when the audible fraction (0 to 1) of a stem changes because a participant muted or unmuted it.
+        /// </summary>
+        public event Action<SongStem, double> StemAudibleFractionChanged;
+
+        public void ChangeStemMuteState(int participantId, SongStem stem, bool muted, float duration = 0.0f)
         {
             var setting = SettingsManager.Settings.MuteOnMiss.Value;
             if (setting == AudioFxMode.Off
@@ -134,20 +129,21 @@ namespace YARG.Gameplay
                 return;
             }
 
-            // The background stem keeps its own split: it stands in for players whose instrument
-            // has no stem of its own, so one of them missing should not silence the whole song.
-            bool keepAudibleUntilAllMiss = SettingsManager.Settings.MuteOnlyWhenAllPlayersMiss.Value
-                && stem != _backgroundStem;
+            var rule = GetStemMuteRule(stem);
+            double before = _stemMutes.GetAudibleFraction(stem, rule);
+            if (!_stemMutes.SetMuted(stem, participantId, muted))
+            {
+                return;
+            }
 
-            double volume = state.SetMute(muted, keepAudibleUntilAllMiss);
+            double fraction = _stemMutes.GetAudibleFraction(stem, rule);
+            double volume = state.Volume * fraction;
 
             if (duration <= 0.0f)
             {
                 GlobalAudioHandler.SetVolumeSetting(stem, volume);
-                return;
             }
-
-            if (_volumeTween == null || !_volumeTween.IsPlaying())
+            else if (_volumeTween == null || !_volumeTween.IsPlaying())
             {
                 _volumeTween = DOTween.To(() => GlobalAudioHandler.GetVolumeSetting(stem),
                     x => GlobalAudioHandler.SetVolumeSetting(stem, x), volume, duration);
@@ -156,6 +152,58 @@ namespace YARG.Gameplay
             {
                 _volumeTween.ChangeEndValue(volume);
             }
+
+            if (fraction != before)
+            {
+                StemAudibleFractionChanged?.Invoke(stem, fraction);
+            }
+        }
+
+        /// <summary>
+        /// Removes a participant (a player who dropped out) from every stem it was counted in,
+        /// restoring the volume the remaining participants imply.
+        /// </summary>
+        public void RemoveStemParticipant(int participantId)
+        {
+            var stems = new List<SongStem>(_stemMutes.StemsOf(participantId));
+            if (stems.Count == 0)
+            {
+                return;
+            }
+
+            var before = new double[stems.Count];
+            for (int i = 0; i < stems.Count; i++)
+            {
+                before[i] = _stemMutes.GetAudibleFraction(stems[i], GetStemMuteRule(stems[i]));
+            }
+
+            _stemMutes.RemoveParticipant(participantId);
+
+            for (int i = 0; i < stems.Count; i++)
+            {
+                var stem = stems[i];
+                double fraction = _stemMutes.GetAudibleFraction(stem, GetStemMuteRule(stem));
+                if (fraction == before[i])
+                {
+                    continue;
+                }
+
+                if (_stemStates.TryGetValue(stem, out var state))
+                {
+                    GlobalAudioHandler.SetVolumeSetting(stem, state.Volume * fraction);
+                }
+
+                StemAudibleFractionChanged?.Invoke(stem, fraction);
+            }
+        }
+
+        private StemMuteRule GetStemMuteRule(SongStem stem)
+        {
+            // The background stem keeps its own split: it stands in for players whose instrument
+            // has no stem of its own, so one of them missing should not silence the whole song.
+            bool allMustMiss = stem != _backgroundStem
+                && (SettingsManager.Settings.MuteOnlyWhenAllPlayersMiss.Value || MultiplayerGameplay.IsInMatch);
+            return allMustMiss ? StemMuteRule.AllMustMiss : StemMuteRule.Proportional;
         }
 
         public void ChangeStemReverbState(SongStem stem, bool reverb)

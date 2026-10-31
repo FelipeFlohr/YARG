@@ -280,10 +280,9 @@ namespace YARG.Gameplay
 
 
             // Set up the crowd stem so it can be restored after muting (if it exists)
-            if (_stemStates.TryGetValue(SongStem.Crowd, out var state))
+            if (_stemStates.ContainsKey(SongStem.Crowd))
             {
-                state.Total = 1;
-                state.Audible = 1;
+                _stemMutes.AddParticipant(SongStem.Crowd, CROWD_PARTICIPANT_ID);
             }
 
             if (_loadState == LoadFailureState.Error)
@@ -660,6 +659,8 @@ namespace YARG.Gameplay
                 _players.Add(vocalsPlayer);
             }
 
+            _players[_players.Count - 1].StemParticipantId = _playerIndex;
+
             // Add (or increase total of) the stem state
             var hasStem = false;
             foreach (var stem in player.Profile.CurrentInstrument.ToSongStems())
@@ -669,19 +670,17 @@ namespace YARG.Gameplay
                 {
                     transformedStem = SongStem.Rhythm;
                 }
-                if (transformedStem != _backgroundStem && _stemStates.TryGetValue(transformedStem, out var state))
+                if (transformedStem != _backgroundStem && _stemStates.ContainsKey(transformedStem))
                 {
                     hasStem = true;
-                    ++state.Total;
-                    ++state.Audible;
+                    _stemMutes.AddParticipant(transformedStem, _playerIndex);
                 }
             }
 
-            if (!hasStem && _stemStates.TryGetValue(_backgroundStem, out var bgState))
+            if (!hasStem && _stemStates.ContainsKey(_backgroundStem))
             {
                 // Ensures the stem will still play at a minimum of 50%, even if all players mute
-                bgState.Total += 2;
-                bgState.Audible += 2;
+                _stemMutes.AddParticipant(_backgroundStem, _playerIndex, weight: 2);
             }
         }
     }

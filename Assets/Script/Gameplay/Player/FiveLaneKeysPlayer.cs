@@ -647,7 +647,7 @@ namespace YARG.Assets.Script.Gameplay.Player
         {
             if (IsStemMuted != muted)
             {
-                GameManager.ChangeStemMuteState(_stem, muted);
+                GameManager.ChangeStemMuteState(StemParticipantId, _stem, muted);
                 IsStemMuted = muted;
             }
         }

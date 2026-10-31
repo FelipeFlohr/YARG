@@ -416,7 +416,7 @@ namespace YARG.Gameplay.Player
         {
             if (_stemMuteStates.TryGetValue(stem, out var isMuted) && isMuted != muted)
             {
-                GameManager.ChangeStemMuteState(stem, muted);
+                GameManager.ChangeStemMuteState(StemParticipantId, stem, muted);
                 _stemMuteStates[stem] = muted;
                 IsStemMuted = AreAllStemsMuted();
             }

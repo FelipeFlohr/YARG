@@ -157,7 +157,7 @@ namespace YARG.Multiplayer
         {
             var manager = MultiplayerManager.Instance;
             await UniTask.Delay(TimeSpan.FromSeconds(_leaveAfter));
-            var gameManager = UnityEngine.Object.FindAnyObjectByType<Gameplay.GameManager>();
+            var gameManager = UnityEngine.Object.FindAnyObjectByType<YARG.Gameplay.GameManager>();
             if (gameManager == null || manager.Session != session)
             {
                 Log("FAIL: not in the match anymore when about to leave");
@@ -178,7 +178,7 @@ namespace YARG.Multiplayer
             foreach (int seconds in new[] { 1, 5, 30 })
             {
                 await UniTask.Delay(TimeSpan.FromSeconds(seconds == 1 ? 1 : seconds == 5 ? 4 : 25));
-                var gameManager = UnityEngine.Object.FindAnyObjectByType<Gameplay.GameManager>();
+                var gameManager = UnityEngine.Object.FindAnyObjectByType<YARG.Gameplay.GameManager>();
                 if (gameManager == null || gameManager.EngineManager == null)
                 {
                     return;

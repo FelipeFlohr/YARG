@@ -24,6 +24,9 @@ namespace YARG.Gameplay.Player
     {
         public int HighwayIndex { get; private set; }
 
+        /// <summary>Id under which this player is counted in the stem mute tracker.</summary>
+        public int StemParticipantId { get; set; }
+
         public YargPlayer Player { get; private set; }
 
         public float NoteSpeed

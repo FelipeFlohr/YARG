@@ -149,7 +149,7 @@ namespace YARG.Gameplay.Player
             Player.DropOut();
             GameManager.EngineManager.Unregister(EngineContainer);
 
-            SetStemMuteState(muted: false);
+            GameManager.RemoveStemParticipant(StemParticipantId);
             ClosePlayerMenu();
 
             GameManager.RefreshAllPlayerMenus();
