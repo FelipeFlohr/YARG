@@ -184,3 +184,15 @@ argumentos. O cenário planejado com pro guitar virou `four-lane`.
 
 Continuam sem teste ponta a ponta: 6 trastes e elite drums (nenhuma música da biblioteca de teste tem esses charts),
 humanos de verdade, duas máquinas em rede real e o áudio ouvido.
+
+### Correções da revisão do PR #3
+
+- O keepalive (heartbeats e timeout de leitura) começa só depois do aperto de mão (`INetTransport.StartKeepAlive`,
+  chamado no `Welcome`), então builds do protocolo antigo recebem o `Reject` de versão em vez de "mensagem malformada".
+- Timeout do transporte de 5 s para 10 s, para tolerar quedas curtas de Wi-Fi ou do relay.
+- O aviso de espera se repete a cada 5 s (o tempo de vida de um toast) e quando a lista muda.
+- Pro guitar virou regra do jogo (`GameModeExtensions.HasGameplayTrack`), usada pelo seletor online, pelo autoteste e
+  num aviso no log quando não dá para criar o jogador.
+
+Revalidado nativo com `band4` e `band8` (OK, banda igual nas 8 máquinas, nenhuma queda por timeout) e 176 testes do
+multiplayer. Os outros 6 cenários não foram repetidos: as mudanças não mexem no mute nem na pontuação.
