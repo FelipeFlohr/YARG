@@ -142,7 +142,8 @@ namespace YARG.Multiplayer
             {
                 passed = role switch
                 {
-                    "host"    => await RunHost(GetArg(args, "-mp-song", ""), int.Parse(GetArg(args, "-mp-rounds", "1"))),
+                    "host"    => await RunHost(GetArg(args, "-mp-song", ""), int.Parse(GetArg(args, "-mp-rounds", "1")),
+                        int.Parse(GetArg(args, "-mp-players", "2"))),
                     "offline" => await RunOffline(GetArg(args, "-mp-song", ""), int.Parse(address)),
                     _         => await RunClient(address),
                 };
@@ -512,7 +513,7 @@ namespace YARG.Multiplayer
             $"sp-revives={stats.StarPowerRevives} " +
             $"sp-time={stats.TimeInStarPower:0.0}s sp-score={stats.StarPowerScore} solo={stats.SoloBonuses} max-combo={stats.MaxCombo}";
 
-        private static async UniTask<bool> RunHost(string songName, int rounds)
+        private static async UniTask<bool> RunHost(string songName, int rounds, int players)
         {
             if (!await PrepareLocalPlayer())
             {
@@ -528,7 +529,7 @@ namespace YARG.Multiplayer
             var session = (HostSession) manager.Session!;
             Log("Hosting");
 
-            if (!await WaitFor("a client", () => session.Players.Count(p => p.Status != LobbyPlayerStatus.Left) >= 2))
+            if (!await WaitFor("the clients", () => session.Players.Count(p => p.Status != LobbyPlayerStatus.Left) >= players))
             {
                 return false;
             }

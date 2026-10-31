@@ -19,7 +19,8 @@ def command(scenario, inst):
         "-logFile", "/work/%s/player.log" % inst["name"],
     ]
     if inst["role"] == "host":
-        cmd += ["-mp-autotest", "host", "-mp-song", scenario["song"], "-mp-rounds", "1"]
+        cmd += ["-mp-autotest", "host", "-mp-song", scenario["song"], "-mp-rounds", "1",
+                "-mp-players", str(len(scenario["instances"]))]
     else:
         cmd += ["-mp-autotest", "join", "127.0.0.1"]
     return cmd + inst["args"]

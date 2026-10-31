@@ -19,7 +19,7 @@ SCENARIOS = {
         "instances": [
             _inst("host", "host", "Guit", "FiveFretGuitar", ["-mp-miss", "30-40"]),
             _bot("bass", "Bass", "FiveFretBass"),
-            _bot("drums", "Drum", "ProDrums"),
+            _bot("drums", "Drum", "FiveLaneDrums"),  # Soliloquy has no ProDrums chart
             _bot("vocals", "Voc", "Vocals"),
         ],
         "expect": {"muted": {"Guitar": {"from": 30, "to": 40}}, "scripted": "Guit"},
