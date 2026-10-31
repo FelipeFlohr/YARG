@@ -43,6 +43,8 @@ namespace Editor
 
             try
             {
+                ReimportShaderGraphs();
+
                 // Addressables content has to be built before the player
                 AddressableAssetSettings.CleanPlayerContent();
                 AddressableAssetSettings.BuildPlayerContent(out var addressablesResult);
@@ -75,6 +77,26 @@ namespace Editor
                 Debug.LogError($"[MultiplayerTestBuild] failed: {e}");
                 EditorApplication.Exit(1);
             }
+        }
+
+        /// <summary>
+        /// <see cref="YARG.Editor.ShaderGraphIncludePatcher"/> swaps URP's includes for the highway ones, but only
+        /// for shader graphs imported after it loaded. On a fresh or updated Library they can be imported before
+        /// that and draw notes with the plain camera projection, squeezed into the middle of the highway.
+        /// </summary>
+        private static void ReimportShaderGraphs()
+        {
+            int count = 0;
+            foreach (string guid in AssetDatabase.FindAssets("t:Shader", new[] { "Assets" }))
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                if (path.EndsWith(".shadergraph", StringComparison.OrdinalIgnoreCase))
+                {
+                    AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceUpdate);
+                    count++;
+                }
+            }
+            Debug.Log($"[MultiplayerTestBuild] reimported {count} shader graphs");
         }
     }
 }
