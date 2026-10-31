@@ -39,6 +39,11 @@ tentativas, todas reprovadas só por tempo (as pontuações e o `Band:` ficaram 
 até 75.0 (janela 60-70 + 5 s de folga). O verificador não foi mexido; repeti o cenário e passou (desmute em 74.61). A
 folga de 5 s está perto do limite nesta máquina (ver "Preocupações").
 
+**Rodada de correção 3 (revisão final).** Build refeita depois de: piso de 50% do stem de background no `StemMuteTracker`,
+regra de dificuldade jogável compartilhada (`PartDifficulty`) no seletor online e no autoteste, e estatísticas do jogador local
+iguais às enviadas em `Finished`. Só `same-instrument` e `no-stems` foram refeitos: ambos `OK` (build `~/yarg-build-mp-banda`).
+`band4` e `keys` não foram refeitos nesta rodada.
+
 ## 1. Pontuação final idêntica em todas as máquinas
 
 - [x] `same-instrument`: host e `guit2` com as mesmas duas linhas `Result:` e `Band: score=208533 stars=5`.
@@ -52,7 +57,7 @@ O verificador compara todas as linhas `Result:` (pontuação, acertos/total) e `
 
 ## 2. Stems separados: o erro do guitarrista muta a guitarra nas outras máquinas e desmuta no próximo acerto
 
-- [x] `band4` (Soliloquy, host erra de 30 a 40 s). Primeiro `Stem Guitar fraction=0.00` e primeiro `1.00` depois:
+- [x] `band4` (Soliloquy, host erra de 30 a 40 s). **Vale para a build antiga (c1108023)**; na build final o `band4` reprovou só pela folga de desmute do verificador, não por falha de mute. Primeiro `Stem Guitar fraction=0.00` e primeiro `1.00` depois:
 
   | Máquina | Papel | mute (0.00) | desmute (1.00) |
   |---|---|---|---|
@@ -64,7 +69,7 @@ O verificador compara todas as linhas `Result:` (pontuação, acertos/total) e `
   A guitarra foi mutada nas 4 máquinas dentro da janela (30 a 42) e voltou a 1.00 até 45. Os remotos atrasam de
   0,4 s a 7 s sobre o host nesta execução; o atraso inclui o buffer de entrada dos remotos e o quadro lento. Depois
   da janela há mutes e desmutes de sustain (fim de sustain solto) que o verificador aceita.
-- [x] `keys` (Subdivisions, guitarrista erra de 60 a 70 s):
+- [x] `keys` (Subdivisions, guitarrista erra de 60 a 70 s). Tempos da tabela: build c1108023. Na build final `keys` passou, com desmute em 70.08 (guitar), 72.19 (host) e 72.84 (prokeys):
 
   | Máquina | Papel | mute (0.00) | desmute (1.00) |
   |---|---|---|---|
@@ -132,10 +137,9 @@ jogador scripted (mutes de sustain que um jogador de verdade não teria).
 - Áudio audível (PCM nulo): só os eventos de volume do stem foram lidos.
 - Render na GPU real (llvmpipe), e qualquer coisa visual (pista remota, HUD, tela de resultados).
 - Fail meter ligado (`NoFail: 1` em todas as instâncias).
-- Vocal com cantor de verdade (só o bot, que faz 14/14).
 - `band4` passando na build final (reprovado só pelos limites de tempo do verificador; ver acima).
 - Os dois jogadores da mesma parte errando juntos (só coberto por testes do núcleo).
-- Dois humanos de verdade no mesmo instrumento; vocal com cantor de verdade.
+- Dois humanos de verdade no mesmo instrumento; vocal com cantor de verdade (só o bot, que faz 14/14).
 
 ## Preocupações
 
