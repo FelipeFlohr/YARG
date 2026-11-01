@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, user-scalable=no">
+    <title>{{{ PRODUCT_NAME }}}</title>
+    <link rel="stylesheet" href="TemplateData/style.css">
+  </head>
+  <body>
+    <canvas id="unity-canvas" tabindex="-1"></canvas>
+
+    <div id="yarg-loading">
+      <div id="yarg-loading-title">{{{ PRODUCT_NAME }}}</div>
+      <div id="yarg-progress"><div id="yarg-progress-fill"></div></div>
+    </div>
+
+    <div id="yarg-start" role="button" tabindex="0">
+      <div id="yarg-start-text">Clique para começar</div>
+    </div>
+
+    <div id="yarg-error" role="alert">
+      <div id="yarg-error-box">
+        <div id="yarg-error-title">Algo deu errado</div>
+        <div id="yarg-error-message"></div>
+        <button id="yarg-error-reload" type="button">Recarregar</button>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        var canvas = document.querySelector("#unity-canvas");
+        var loading = document.querySelector("#yarg-loading");
+        var progressFill = document.querySelector("#yarg-progress-fill");
+        var start = document.querySelector("#yarg-start");
+        var errorScreen = document.querySelector("#yarg-error");
+        var errorMessage = document.querySelector("#yarg-error-message");
+
+        window.yargUserGesture = false;
+
+        // Shows the error screen. Also used by YargStreamingAssets.jspre.
+        window.yargShowError = function (message) {
+          errorMessage.textContent = String(message || "Erro desconhecido");
+          loading.style.display = "none";
+          start.style.display = "none";
+          errorScreen.style.display = "flex";
+        };
+
+        document.querySelector("#yarg-error-reload").addEventListener("click", function () {
+          location.reload();
+        });
+
+        // The click is the user gesture that unlocks audio in the browser
+        function dismissStart() {
+          window.yargUserGesture = true;
+          start.style.display = "none";
+          canvas.focus();
+        }
+        start.addEventListener("click", dismissStart);
+        start.addEventListener("keydown", function (e) {
+          if (e.key === "Enter" || e.key === " ") {
+            dismissStart();
+          }
+        });
+
+        window.addEventListener("error", function (e) {
+          var message = (e && e.message) ? String(e.message) : "";
+          if (message.toLowerCase().indexOf("memory") >= 0) {
+            window.yargShowError(message);
+          }
+        });
+
+        var buildUrl = "Build";
+        var config = {
+          arguments: [],
+          dataUrl: buildUrl + "/{{{ DATA_FILENAME }}}",
+          frameworkUrl: buildUrl + "/{{{ FRAMEWORK_FILENAME }}}",
+#if USE_THREADS
+          workerUrl: buildUrl + "/{{{ WORKER_FILENAME }}}",
+#endif
+#if USE_WASM
+          codeUrl: buildUrl + "/{{{ CODE_FILENAME }}}",
+#endif
+#if SYMBOLS_FILENAME
+          symbolsUrl: buildUrl + "/{{{ SYMBOLS_FILENAME }}}",
+#endif
+          streamingAssetsUrl: "StreamingAssets",
+          companyName: {{{ JSON.stringify(COMPANY_NAME) }}},
+          productName: {{{ JSON.stringify(PRODUCT_NAME) }}},
+          productVersion: {{{ JSON.stringify(PRODUCT_VERSION) }}},
+          showBanner: function (message, type) {
+            if (type === "error") {
+              window.yargShowError(message);
+            } else {
+              console.warn(message);
+            }
+          },
+        };
+
+        var script = document.createElement("script");
+        script.src = buildUrl + "/{{{ LOADER_FILENAME }}}";
+        script.onload = function () {
+          createUnityInstance(canvas, config, function (progress) {
+            progressFill.style.width = (100 * progress) + "%";
+          }).then(function () {
+            loading.style.display = "none";
+          }).catch(function (message) {
+            window.yargShowError(message);
+          });
+        };
+        script.onerror = function () {
+          window.yargShowError("Não foi possível carregar " + script.src);
+        };
+        document.body.appendChild(script);
+      })();
+    </script>
+  </body>
+</html>
