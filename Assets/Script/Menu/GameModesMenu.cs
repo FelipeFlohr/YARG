@@ -1,10 +1,12 @@
 ﻿using TMPro;
 using UnityEngine;
 using YARG.Core.Input;
+using YARG.Helpers;
 using YARG.Menu.Career;
 using YARG.Menu.MusicLibrary;
 using YARG.Menu.Navigation;
 using YARG.Menu.Persistent;
+using YARG.Menu.Web;
 
 namespace YARG.Menu
 {
@@ -38,6 +40,13 @@ namespace YARG.Menu
 
         public void Practice()
         {
+            // The web build has no library: the player loads a song from disk
+            if (PlatformInfo.IsWeb)
+            {
+                WebSongMenu.Open(true);
+                return;
+            }
+
             var menu = MenuManager.Instance.PushMenu(MenuManager.Menu.MusicLibrary, false);
 
             MusicLibraryMenu.LibraryMode = MusicLibraryMode.Practice;
