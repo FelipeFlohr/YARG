@@ -2,7 +2,7 @@ fileFormatVersion: 2
 guid: b4872f45c2e3ec746aaa89589b00755e
 PluginImporter:
   externalObjects: {}
-  serializedVersion: 2
+  serializedVersion: 3
   iconMap: {}
   executionOrder: {}
   defineConstraints: []
@@ -11,50 +11,38 @@ PluginImporter:
   isExplicitlyReferenced: 0
   validateReferences: 1
   platformData:
-  - first:
-      : Any
-    second:
+    Android:
       enabled: 0
+      settings:
+        Is16KbAligned: true
+    Any:
+      enabled: 1
       settings:
         Exclude Editor: 0
         Exclude Linux64: 0
         Exclude OSXUniversal: 1
+        Exclude WebGL: 1
         Exclude Win: 0
         Exclude Win64: 0
-  - first:
-      Any: 
-    second:
-      enabled: 1
-      settings: {}
-  - first:
-      Editor: Editor
-    second:
+    Editor:
       enabled: 1
       settings:
         CPU: x86_64
         DefaultValueInitialized: true
         OS: Linux
-  - first:
-      Standalone: Linux64
-    second:
+    Linux64:
       enabled: 1
       settings:
         CPU: AnyCPU
-  - first:
-      Standalone: OSXUniversal
-    second:
+    OSXUniversal:
       enabled: 0
       settings:
         CPU: None
-  - first:
-      Standalone: Win
-    second:
+    Win:
       enabled: 1
       settings:
         CPU: x86
-  - first:
-      Standalone: Win64
-    second:
+    Win64:
       enabled: 1
       settings:
         CPU: x86_64
