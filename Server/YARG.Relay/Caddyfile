@@ -1,0 +1,27 @@
+{$YARG_DOMAIN} {
+	encode zstd gzip
+
+	# The relay; WebSocket upgrades pass through reverse_proxy as is
+	handle /ws {
+		reverse_proxy relay:8080
+	}
+
+	handle {
+		root * /srv/yarg
+
+		# Unity's Brotli output: *.br files served with Content-Encoding and the real type
+		@br path *.br
+		header @br Content-Encoding br
+		@wasm path *.wasm.br
+		header @wasm Content-Type application/wasm
+		@js path *.js.br
+		header @js Content-Type application/javascript
+		@data path *.data.br
+		header @data Content-Type application/octet-stream
+
+		# The build changes on every deploy; only the hashed-name files could be cached for long
+		header Cache-Control "no-cache"
+
+		file_server
+	}
+}
