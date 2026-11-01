@@ -410,6 +410,31 @@ namespace YARG.Settings
             }
         }
 
+        /// <summary>
+        /// Whether <paramref name="json"/> is a settings file that <see cref="LoadSettings"/> would accept,
+        /// written by YARG (it carries the schema version). Used to validate imports before replacing anything.
+        /// </summary>
+        public static bool CanLoadSettings(string json)
+        {
+            try
+            {
+                var settingsJson = JObject.Parse(json);
+                if (settingsJson[SettingsMigration.SETTINGS_SCHEMA_VERSION_PROPERTY] is not { Type: JTokenType.Integer })
+                {
+                    return false;
+                }
+
+                settingsJson = SettingsMigration.Migrate(settingsJson, out bool canSave);
+                return canSave && JsonConvert.DeserializeObject<SettingContainer>(
+                    settingsJson.ToString(Formatting.None), JsonSettings) != null;
+            }
+            catch (Exception e)
+            {
+                YargLogger.LogFormatWarning("Imported settings are invalid: {0}", e.Message);
+                return false;
+            }
+        }
+
         private static bool IsWindows() => Application.platform is RuntimePlatform.WindowsPlayer or
             RuntimePlatform.WindowsEditor;
 

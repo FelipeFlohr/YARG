@@ -12,11 +12,11 @@ export async function bootToMenu(page) {
 
   page.on('console', (msg) => {
     const text = msg.text();
-    if (msg.type() === 'error' && text.includes('Exception')) errors.push(text);
+    if (msg.type() === 'error' && (text.includes('Exception') || text.includes('web preload'))) errors.push(text);
     if (text.includes('Main menu ready')) ready();
   });
   page.on('pageerror', (err) => {
-    if (String(err.message || err).includes('Exception')) errors.push(String(err.message || err));
+    errors.push(String(err.message || err));
   });
 
   await page.goto('/');
@@ -32,26 +32,39 @@ export async function bootToMenu(page) {
   expect(errors, 'console.error with Exception').toEqual([]);
 }
 
-test('boots to the main menu', async ({ page }) => {
+test('boots to the main menu', async ({ page }, testInfo) => {
   await bootToMenu(page);
+  await page.waitForTimeout(2000);
+  await page.screenshot({ path: testInfo.outputPath('main-menu.png') });
 });
 
-test('profiles round-trip through localStorage', async ({ page }) => {
+test('profiles round-trip through localStorage', async ({ context, page }) => {
   await bootToMenu(page);
-  const read = async (key) => page.evaluate((k) => localStorage.getItem(k), key);
+  const read = async (p, key) => p.evaluate((k) => localStorage.getItem(k), key);
 
-  expect(await read('yarg.settings')).not.toBeNull();
-  expect(await read('yarg.schemaVersion')).toBe('1');
+  expect(await read(page, 'yarg.settings')).not.toBeNull();
+  expect(await read(page, 'yarg.schemaVersion')).toBe('1');
 
-  let profiles = JSON.parse((await read('yarg.profiles')) ?? '[]');
+  let profiles = JSON.parse((await read(page, 'yarg.profiles')) ?? '[]');
   if (!Array.isArray(profiles) || profiles.length === 0) {
     profiles = [fixtureProfile];
   }
   profiles[0].Name = 'Ação 🎸';
-  await page.evaluate((p) => localStorage.setItem('yarg.profiles', p), JSON.stringify(profiles));
 
-  await bootToMenu(page); // reloads
-  profiles = JSON.parse(await read('yarg.profiles'));
+  // The game saves its in-memory profiles when the page is hidden or closed, so storage is edited
+  // with the game closed: close this page, then seed the edited profiles once into a fresh one.
+  await page.close({ runBeforeUnload: true });
+  const next = await context.newPage();
+  await next.addInitScript((p) => {
+    if (!sessionStorage.getItem('yarg.test.seeded')) {
+      sessionStorage.setItem('yarg.test.seeded', '1');
+      localStorage.setItem('yarg.profiles', p);
+    }
+  }, JSON.stringify(profiles));
+
+  await bootToMenu(next); // C# loads the edited profiles
+  await bootToMenu(next); // reload: the game saves them back on page hide and loads them again
+  profiles = JSON.parse(await read(next, 'yarg.profiles'));
   expect(profiles[0].Name).toBe('Ação 🎸');
 });
 

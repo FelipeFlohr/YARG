@@ -109,6 +109,29 @@ mergeInto(LibraryManager.library, {
         }
     },
 
+    YargWeb_OnPageHide: function (objectNamePtr, methodPtr) {
+        var objectName = UTF8ToString(objectNamePtr);
+        var method = UTF8ToString(methodPtr);
+        var send = function () {
+            try {
+                if (typeof Module !== "undefined" && typeof Module.SendMessage === "function") {
+                    Module.SendMessage(objectName, method);
+                } else if (typeof SendMessage === "function") {
+                    SendMessage(objectName, method);
+                }
+            } catch (e) {
+                console.error("YargWeb_OnPageHide callback failed", e);
+            }
+        };
+        // Unity does not run OnDisable/OnApplicationQuit when the tab is closed or reloaded
+        window.addEventListener("pagehide", send);
+        document.addEventListener("visibilitychange", function () {
+            if (document.visibilityState === "hidden") {
+                send();
+            }
+        });
+    },
+
     YargWeb_Reload: function () {
         try {
             window.location.reload();

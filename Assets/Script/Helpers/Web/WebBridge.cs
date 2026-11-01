@@ -25,6 +25,9 @@ namespace YARG.Helpers.Web
         [DllImport("__Internal", EntryPoint = "YargWeb_PickTextFile")]
         private static extern void PickTextFileNative(string accept, string gameObjectName, string callbackMethod);
 
+        [DllImport("__Internal", EntryPoint = "YargWeb_OnPageHide")]
+        private static extern void OnPageHideNative(string gameObjectName, string callbackMethod);
+
         [DllImport("__Internal", EntryPoint = "YargWeb_Reload")]
         private static extern void ReloadNative();
 
@@ -39,6 +42,10 @@ namespace YARG.Helpers.Web
         public static void PickTextFile(string accept, string gameObjectName, string callbackMethod)
             => PickTextFileNative(accept, gameObjectName, callbackMethod);
 
+        /// <summary>Calls back (SendMessage) when the tab is hidden, closed or reloaded.</summary>
+        public static void OnPageHide(string gameObjectName, string callbackMethod)
+            => OnPageHideNative(gameObjectName, callbackMethod);
+
         public static void Reload() => ReloadNative();
 #else
         public static string GetQueryString() => null;
@@ -52,6 +59,10 @@ namespace YARG.Helpers.Web
         }
 
         public static void PickTextFile(string accept, string gameObjectName, string callbackMethod)
+        {
+        }
+
+        public static void OnPageHide(string gameObjectName, string callbackMethod)
         {
         }
 

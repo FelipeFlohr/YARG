@@ -13,7 +13,7 @@ namespace Editor
 {
     /// <summary>
     /// Builds the WebGL player (batchmode).
-    /// Usage: <c>-buildTarget WebGL -executeMethod Editor.WebBuild.Build [-webBuildOutput dir] [-webDiagnostics] [-webDev]</c>,
+    /// Usage: <c>-buildTarget WebGL -executeMethod Editor.WebBuild.Build [-webBuildOutput dir] [-webDiagnostics] [-webDev] [-webTestHooks]</c>,
     /// the output defaults to <c>~/yarg-build-web</c>.
     /// <para>
     /// <c>-webDev</c> is a fast, incremental build for iterating (not for deploying): it skips the shader graph
@@ -22,6 +22,11 @@ namespace Editor
     /// (the files have no <c>.br</c> extension). Keep the same output folder and do not clean Library/Bee between
     /// builds. The player settings it changes are restored afterwards, so they never stay in ProjectSettings.asset.
     /// </para>
+    /// <para>
+    /// <c>-webTestHooks</c> (implied by <c>-webDev</c>) defines <c>YARG_WEB_TEST_HOOKS</c>: the page accepts every
+    /// command line argument from its query string (<c>-mp-autotest</c> and friends). The release build, without it,
+    /// only accepts arguments that cannot change stored data, since anyone can craft a link to the public page.
+    /// </para>
     /// Exit codes: 0 on success, 1 when the player build fails, 2 when the Addressables build fails.
     /// </summary>
     public static class WebBuild
@@ -29,6 +34,8 @@ namespace Editor
         private const string OUTPUT_ARG = "-webBuildOutput";
         private const string DIAGNOSTICS_ARG = "-webDiagnostics";
         private const string DEV_ARG = "-webDev";
+        private const string TEST_HOOKS_ARG = "-webTestHooks";
+        private const string YARG_WEB_TEST_HOOKS = "YARG_WEB_TEST_HOOKS";
         private const string YARG_NO_THREADS = "YARG_NO_THREADS";
         private const string ZSTRING_TEXTMESHPRO_SUPPORT = "ZSTRING_TEXTMESHPRO_SUPPORT";
         private const string MANIFEST_NAME = "web-manifest.json";
@@ -98,7 +105,9 @@ namespace Editor
                     target = BuildTarget.WebGL,
                     targetGroup = BuildTargetGroup.WebGL,
                     locationPathName = output,
-                    extraScriptingDefines = new[] { YARG_NO_THREADS },
+                    extraScriptingDefines = dev || args.Contains(TEST_HOOKS_ARG)
+                        ? new[] { YARG_NO_THREADS, YARG_WEB_TEST_HOOKS }
+                        : new[] { YARG_NO_THREADS },
                 };
                 if (dev)
                 {
@@ -201,6 +210,12 @@ namespace Editor
         /// Native desktop libraries (BASS, Discord, SQLite, VLC, LibUSB, ...) are imported for "Any Platform" and
         /// would otherwise collide in the WebGL build, which cannot load them anyway.
         /// </summary>
+        private static readonly BuildTarget[] LIB_PLATFORMS =
+        {
+            BuildTarget.StandaloneWindows, BuildTarget.StandaloneWindows64, BuildTarget.StandaloneLinux64,
+            BuildTarget.StandaloneOSX, BuildTarget.WebGL,
+        };
+
         private static void ExcludeNativePluginsFromWeb()
         {
             foreach (var importer in PluginImporter.GetAllImporters())
@@ -213,6 +228,25 @@ namespace Editor
                 }
 
                 bool changed = false;
+                if (path.EndsWith(".lib", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Import libraries are only for linking native code; they belong in no player. Unity 6 imports
+                    // them as plugins enabled for Any Platform, which would copy them into desktop builds.
+                    if (importer.GetCompatibleWithAnyPlatform() || importer.GetCompatibleWithEditor())
+                    {
+                        importer.ClearSettings();
+                        importer.SetCompatibleWithAnyPlatform(false);
+                        importer.SetCompatibleWithEditor(false);
+                        foreach (var target in LIB_PLATFORMS)
+                        {
+                            importer.SetCompatibleWithPlatform(target, false);
+                        }
+                        Debug.Log($"[WebBuild] excluding {path} from every platform");
+                        importer.SaveAndReimport();
+                    }
+                    continue;
+                }
+
                 if (importer.GetCompatibleWithAnyPlatform() && !importer.GetExcludeFromAnyPlatform(BuildTarget.WebGL))
                 {
                     importer.SetExcludeFromAnyPlatform(BuildTarget.WebGL, true);

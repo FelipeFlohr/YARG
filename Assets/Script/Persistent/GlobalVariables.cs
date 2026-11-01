@@ -90,6 +90,10 @@ namespace YARG
             // Initialize important classes
 
             WebConfigStore.Restore();
+            if (PlatformInfo.IsWeb)
+            {
+                WebConfigTransfer.Initialize();
+            }
             ReplayContainer.Init();
             ScoreContainer.Init();
             PlaylistContainer.Initialize();

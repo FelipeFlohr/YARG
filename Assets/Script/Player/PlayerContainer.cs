@@ -369,6 +369,28 @@ namespace YARG.Player
             public bool StructurallyReadable;
         }
 
+        /// <summary>
+        /// Whether <paramref name="json"/> is a non-empty profile array in which every record loads, without
+        /// registering anything. Used to validate imports before replacing the stored profiles.
+        /// </summary>
+        public static bool CanLoadProfiles(string json)
+        {
+            try
+            {
+                if (JToken.Parse(json) is not JArray { Count: > 0 } array)
+                {
+                    return false;
+                }
+
+                return array.All(token => token is JObject && token.ToObject<YargProfile>() != null);
+            }
+            catch (Exception e)
+            {
+                YargLogger.LogFormatWarning("Imported profiles are invalid: {0}", e.Message);
+                return false;
+            }
+        }
+
         public static int LoadProfiles()
         {
             _profiles.Clear();
