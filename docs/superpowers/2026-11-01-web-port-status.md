@@ -65,7 +65,7 @@ Mergeado nos forks (YARG#6, YARG.Core#2) e depois a rodada de testes e lobby em 
   - O `lobby.spec.mjs` joga tudo pela UI: senha errada, depois a certa; diferença de 2,5–14 ms entre host e convidado; o host continua quando o convidado sai.
 - **Deploy** em `deploy/`: Docker Compose com o relay, o Caddy servindo o build local por bind mount e um sidecar Tailscale.
   - Unity dentro do Docker ficou de fora (licença, `Library` de 8 GB, 31 min de build): o build é feito no PC e montado.
-  - Não testados contra hosts reais: o primeiro boot do sidecar e o `publish.sh`.
+  - Não testados contra hosts reais: o primeiro boot do sidecar e o `deploy/start.sh` numa VPS. O build vai para `deploy/volume/web` copiado à mão (o servidor só clona o repo).
 - **HTTPS é necessário.** Microfone (vocais) e AudioWorklet só existem em contexto seguro, e o Unity recusa addressables por `http:` fora de localhost. Use `https://yarg.<tailnet>.ts.net` pelo sidecar (tabela no `deploy/README.md`).
 - **Suíte web**: 14 passaram e 1 foi pulado. **Regressão desktop**: offline PASS; host + cliente PASS, com `Band: score=608800 stars=5` nos dois lados.
 
