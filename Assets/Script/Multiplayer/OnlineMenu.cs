@@ -92,7 +92,10 @@ namespace YARG.Multiplayer
         private IReadOnlyList<RelayRoom> _rooms = new List<RelayRoom>();
         private RelayRoom _selectedRoom;
         private int _maxPlayers = 4;
+        // A create or join waiting on the relay; the room list refreshes on its own flag, so a slow relay
+        // doesn't swallow the buttons
         private bool _busy;
+        private bool _refreshing;
         private float _lastRoomRefresh = float.NegativeInfinity;
         private float _lastLobbyRefresh = float.NegativeInfinity;
         private SongEntry _coverSong;
@@ -250,7 +253,7 @@ namespace YARG.Multiplayer
         {
             if (_view == View.Rooms)
             {
-                if (!_busy && Time.unscaledTime - _lastRoomRefresh >= ROOM_REFRESH_INTERVAL)
+                if (!_refreshing && !_busy && Time.unscaledTime - _lastRoomRefresh >= ROOM_REFRESH_INTERVAL)
                 {
                     RefreshRooms().Forget();
                 }
@@ -310,20 +313,25 @@ namespace YARG.Multiplayer
 
         private async UniTaskVoid RefreshRooms()
         {
-            if (_busy)
+            // Once a create or join is on its way the transport is about to belong to a room
+            if (_refreshing || _busy)
             {
                 return;
             }
 
-            _busy = true;
+            _refreshing = true;
             _lastRoomRefresh = Time.unscaledTime;
             var (rooms, error) = await MultiplayerWebMenu.ListRoomsAsync();
-            _busy = false;
+            _refreshing = false;
             _lastRoomRefresh = Time.unscaledTime;
-            if (this == null || _view != View.Rooms)
+            // Stale when the player left the screen, or created or joined a room meanwhile
+            if (this == null || !isActiveAndEnabled || _view != View.Rooms || _busy)
             {
                 return;
             }
+
+            // Joinable rooms first, since only the first rows fit
+            rooms = rooms?.OrderBy(r => r.IsFull || r.Playing).ToList();
 
             if (error != null)
             {
@@ -360,9 +368,10 @@ namespace YARG.Multiplayer
 
         private void FillRooms()
         {
-            _roomCount.text = _rooms.Count == 0
-                ? string.Empty
-                : Localize.KeyFormat("Menu.Multiplayer.Online.RoomCount", _rooms.Count);
+            _roomCount.text = _rooms.Count == 0 ? string.Empty
+                : _rooms.Count > _roomRows.Count
+                    ? Localize.KeyFormat("Menu.Multiplayer.Online.RoomCountMore", _rooms.Count, _roomRows.Count)
+                    : Localize.KeyFormat("Menu.Multiplayer.Online.RoomCount", _rooms.Count);
             _roomsEmpty.gameObject.SetActive(_rooms.Count == 0);
 
             for (int i = 0; i < _roomRows.Count; i++)
@@ -531,6 +540,7 @@ namespace YARG.Multiplayer
 
         private void Back()
         {
+            // A refresh may still be waiting; dropping the transport fails it, and its result is ignored
             if (_busy)
             {
                 return;

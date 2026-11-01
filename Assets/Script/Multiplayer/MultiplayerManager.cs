@@ -70,13 +70,13 @@ namespace YARG.Multiplayer
         public double Now => _clock.Elapsed.TotalSeconds;
 
         /// <summary>
-        /// The one player on this machine taking part in the session.
-        /// </summary>
-        /// <summary>
         /// Host: the song offered to the room, from this machine's library or upload.
         /// </summary>
         public SongEntry? OfferedSong => _offeredSong;
 
+        /// <summary>
+        /// The one player on this machine taking part in the session.
+        /// </summary>
         public YargPlayer? LocalPlayer => PlayerContainer.Players.FirstOrDefault(player => !player.SittingOut);
 
         /// <summary>

@@ -130,10 +130,11 @@ namespace YARG.Multiplayer
             _transport = null;
         }
 
-        private static string Fail(RelayException error)
+        private static string Fail(WebSocketTransport transport, RelayException error)
         {
             YargLogger.LogFormatWarning("Relay request failed: {0}", error.Message);
-            if (error.Code == RelayException.CONNECTION_LOST)
+            // Only this request's socket: the screen may have dropped it and opened another meanwhile
+            if (error.Code == RelayException.CONNECTION_LOST && transport == _transport)
             {
                 DropTransport();
             }
@@ -152,7 +153,7 @@ namespace YARG.Multiplayer
             }
             catch (RelayException e)
             {
-                return (null, Fail(e));
+                return (null, Fail(transport, e));
             }
         }
 
@@ -168,7 +169,7 @@ namespace YARG.Multiplayer
             }
             catch (RelayException e)
             {
-                return Fail(e);
+                return Fail(transport, e);
             }
 
             // The session owns the transport now
@@ -191,7 +192,7 @@ namespace YARG.Multiplayer
             }
             catch (RelayException e)
             {
-                return Fail(e);
+                return Fail(transport, e);
             }
 
             _transport = null;

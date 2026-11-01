@@ -1,6 +1,5 @@
 using System.Linq;
 using Cysharp.Threading.Tasks;
-using UnityEngine;
 using YARG.Core;
 using YARG.Core.Extensions;
 using YARG.Core.Logging;
@@ -11,11 +10,8 @@ using YARG.Localization;
 using YARG.Menu;
 using YARG.Menu.Dialogs;
 using YARG.Menu.DifficultySelect;
-using YARG.Menu.MusicLibrary;
-using YARG.Menu.Navigation;
 using YARG.Menu.Persistent;
 using YARG.Multiplayer.Protocol;
-using YARG.Multiplayer.Session;
 using YARG.Player;
 
 namespace YARG.Multiplayer
