@@ -1,4 +1,6 @@
 import { defineConfig } from '@playwright/test';
+import os from 'node:os';
+import path from 'node:path';
 
 const port = Number(process.env.YARG_WEB_PORT || 8089);
 
@@ -18,8 +20,27 @@ export default defineConfig({
     baseURL: `http://127.0.0.1:${port}`,
     headless: true,
     launchOptions: {
-      args: ['--mute-audio', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader', '--use-angle=swiftshader'],
+      // audio.spec.mjs writes the fake microphone WAV (a 440 Hz tone) before its tests run
+      args: ['--mute-audio', '--ignore-gpu-blocklist', '--enable-unsafe-swiftshader', '--use-angle=swiftshader',
+        '--autoplay-policy=no-user-gesture-required', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream',
+        `--use-file-for-fake-audio-capture=${path.join(os.tmpdir(), 'yarg-fake-mic-440.wav')}`],
     },
   },
-  projects: [{ name: 'chromium', use: { browserName: 'chromium' } }],
+  projects: [
+    { name: 'chromium', use: { browserName: 'chromium' }, testIgnore: 'gameplay.spec.mjs' },
+    {
+      // Real GPU (ANGLE on D3D11) in the new headless mode, for frame rate measurements; still muted
+      name: 'gpu',
+      testMatch: 'gameplay.spec.mjs',
+      use: {
+        browserName: 'chromium',
+        // Installed Edge (temporary profile, headless): the full Chromium download is blocked from running here
+        channel: process.env.YARG_WEB_GPU_CHANNEL || 'msedge',
+        launchOptions: {
+          args: ['--mute-audio', '--ignore-gpu-blocklist', '--use-angle=d3d11', '--enable-gpu',
+            '--autoplay-policy=no-user-gesture-required'],
+        },
+      },
+    },
+  ],
 });

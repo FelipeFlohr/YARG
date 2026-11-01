@@ -3,6 +3,7 @@
 import { test, expect } from '@playwright/test';
 import path from 'node:path';
 import { buildSongFixtures, buildDir } from './fixtures/make-song.mjs';
+import { dismissAntiPiracyDialog } from './fixtures/dialogs.mjs';
 
 const FIXTURES = '/__fixtures/song-build/';
 
@@ -54,6 +55,7 @@ async function bootToMenu(page, log) {
   await Promise.race([log.waitFor('Main menu ready', { timeout: 170_000 }), failed]);
   // Lets the menu finish its first frames before input
   await page.waitForTimeout(1000);
+  await dismissAntiPiracyDialog(page);
   return errors;
 }
 
@@ -84,14 +86,14 @@ test('loads a song, plays it to the score screen and loads another', async ({ pa
   expect(files.some((f) => f.endsWith('.zip')), files.join('\n')).toBe(false);
   expect(files.some((f) => f.endsWith('/notes.chart')), files.join('\n')).toBe(true);
 
-  // Play (Enter = Green) opens the normal difficulty menu; Escape comes back
+  // Play opens the normal difficulty menu (Enter = Start once the bot has a keyboard profile); Red (2) comes back
   await command(page, 'bot');
   await log.waitFor('[WebSongTest] Done: bot');
   await page.keyboard.press('Enter');
   await page.waitForTimeout(1500);
   await shot(page, testInfo, '2-difficulty-select');
   let before = log.count('[WebSong] Screen: Song');
-  await page.keyboard.press('Escape');
+  await page.keyboard.press('Digit2');
   await log.waitFor('[WebSong] Screen: Song', { after: before });
 
   // Gameplay with the bot, until the score screen
