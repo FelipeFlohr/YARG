@@ -9,6 +9,7 @@ using UnityEngine.UI;
 using YARG.Core.Audio;
 using YARG.Core.Game;
 using YARG.Core.Logging;
+using YARG.Helpers;
 using YARG.Helpers.Extensions;
 using YARG.Input;
 using YARG.Localization;
@@ -354,7 +355,7 @@ namespace YARG.Menu.ProfileList
             List<InputDeviceInfo> mics;
             try
             {
-                mics = await UniTask.RunOnThreadPool(() => GlobalAudioHandler.GetAllInputDevices(),
+                mics = await PlatformTask.Run(() => GlobalAudioHandler.GetAllInputDevices(),
                     cancellationToken: ct);
                 await UniTask.SwitchToMainThread(cancellationToken: ct);
             }

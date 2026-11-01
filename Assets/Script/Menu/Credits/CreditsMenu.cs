@@ -214,7 +214,7 @@ namespace YARG.Menu.Credits
 
         public static void DownloadCredits()
         {
-            var creditsPath = Path.Combine(Application.streamingAssetsPath, "Credits.json");
+            var creditsPath = Path.Combine(PathHelper.StreamingAssetsPath, "Credits.json");
 
             if (File.Exists(creditsPath))
             {

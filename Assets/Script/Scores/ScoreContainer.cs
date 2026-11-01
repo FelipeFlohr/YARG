@@ -7,6 +7,7 @@ using YARG.Core.Game;
 using YARG.Core.Logging;
 using YARG.Core.Song;
 using YARG.Helpers;
+using YARG.Helpers;
 using YARG.Helpers.Extensions;
 using YARG.Player;
 using YARG.Settings;
@@ -30,6 +31,11 @@ namespace YARG.Scores
         public static string ScoreDirectory { get; private set; }
         public static string ScoreReplayDirectory { get; private set; }
         public static CareerDatabase Careers { get; private set; }
+
+        /// <summary>
+        /// Whether scores can be stored. False on the web, which has no SQLite database.
+        /// </summary>
+        public static bool IsAvailable => !PlatformInfo.IsWeb;
 
         private static string _scoreDatabaseFile;
 
@@ -68,6 +74,11 @@ namespace YARG.Scores
             ScoreDirectory = Path.Combine(PathHelper.PersistentDataPath, "scores");
             ScoreReplayDirectory = Path.Combine(ScoreDirectory, "replays");
 
+            if (!IsAvailable)
+            {
+                return;
+            }
+
             _scoreDatabaseFile = Path.Combine(ScoreDirectory, "scores.db");
 
             try
@@ -88,7 +99,7 @@ namespace YARG.Scores
 
         public static void Destroy()
         {
-            _db.Dispose();
+            _db?.Dispose();
         }
 
         private static void FetchBandHighScores()
@@ -124,6 +135,11 @@ namespace YARG.Scores
 
         public static void RecordScore(GameRecord gameRecord, List<PlayerScoreRecord> playerEntries)
         {
+            if (_db == null)
+            {
+                return;
+            }
+
             try
             {
                 // Add the game record
@@ -259,11 +275,21 @@ namespace YARG.Scores
 
         public static void RecordPlayerInfo(Guid id, string name)
         {
+            if (_db == null)
+            {
+                return;
+            }
+
             _db.InsertPlayerRecord(id, name);
         }
 
         public static List<GameRecord> GetAllGameRecords()
         {
+            if (_db == null)
+            {
+                return new List<GameRecord>();
+            }
+
             try
             {
                 return _db.QueryAllScoresByDate();
@@ -278,6 +304,11 @@ namespace YARG.Scores
 
         public static List<PlayerScoreRecord> GetAllPlayerScoreRecords()
         {
+            if (_db == null)
+            {
+                return new List<PlayerScoreRecord>();
+            }
+
             try
             {
                 return _db.QueryAllPlayerScoreRecords();
@@ -292,6 +323,11 @@ namespace YARG.Scores
 
         public static List<PlayerScoreRecord> GetAllScoresByPlayerId(Guid id)
         {
+            if (_db == null)
+            {
+                return new List<PlayerScoreRecord>();
+            }
+
             try
             {
                 return _db.QueryPlayerScores(id);
@@ -365,6 +401,11 @@ namespace YARG.Scores
 
         private static PlayerScoreRecord GetHighScoreFromDatabase(HashWrapper songChecksum, Guid playerId, Instrument instrument)
         {
+            if (_db == null)
+            {
+                return null;
+            }
+
             try
             {
                 return _db.QueryPlayerSongHighScore(
@@ -402,6 +443,11 @@ namespace YARG.Scores
 
         private static PlayerScoreRecord GetHighestPercentageFromDatabase(HashWrapper songChecksum, Guid playerId, Instrument instrument)
         {
+            if (_db == null)
+            {
+                return null;
+            }
+
             try
             {
                 return _db.QueryPlayerSongHighestPercentage(
@@ -417,6 +463,11 @@ namespace YARG.Scores
 
         private static void FetchHighScores(Guid playerId, IReadOnlyList<Instrument> instruments)
         {
+            if (_db == null)
+            {
+                return;
+            }
+
             if (instruments == null || instruments.Count == 0) return;
 
             var profile = PlayerContainer.GetProfileById(playerId);
@@ -568,6 +619,11 @@ namespace YARG.Scores
 
         public static List<SongEntry> GetMostPlayedSongs(int maxCount)
         {
+            if (_db == null)
+            {
+                return new List<SongEntry>();
+            }
+
             try
             {
                 var results = new List<SongEntry>();
@@ -593,6 +649,11 @@ namespace YARG.Scores
 
         public static List<SongEntry> GetMostPlayedSongs(int maxCount, Func<SongEntry, bool> predicate)
         {
+            if (_db == null)
+            {
+                return new List<SongEntry>();
+            }
+
             try
             {
                 var results = new List<SongEntry>();
@@ -633,6 +694,11 @@ namespace YARG.Scores
         // this is the same as GetMostPlayedSongs, but is limited to the one profile and returns the entire list
         public static Dictionary<SongEntry,int> GetPlayedSongsForUserByPlaycount(YargProfile profile, SortOrdering ordering)
         {
+            if (_db == null)
+            {
+                return new Dictionary<SongEntry, int>();
+            }
+
             try
             {
                 var songPlays = new Dictionary<SongEntry, int>();
@@ -662,6 +728,11 @@ namespace YARG.Scores
 
         public static Dictionary<HashWrapper, StarAmount> GetBestStarsForSong(YargProfile profile)
         {
+            if (_db == null)
+            {
+                return new Dictionary<HashWrapper, StarAmount>();
+            }
+
             try
             {
                 var drumInstruments = MidiDrumkitHelper.GetInstruments(profile.GameMode);
@@ -728,6 +799,11 @@ namespace YARG.Scores
                 return GetHighScore(songChecksum, playerId, instruments[0]);
             }
 
+            if (_db == null)
+            {
+                return null;
+            }
+
             if (allowCacheUpdate)
                 FetchHighScores(playerId, instruments);
 
@@ -764,6 +840,11 @@ namespace YARG.Scores
             if (instruments.Count == 1)
             {
                 return GetBestPercentageScore(songChecksum, playerId, instruments[0]);
+            }
+
+            if (_db == null)
+            {
+                return null;
             }
 
             if (allowCacheUpdate)

@@ -33,9 +33,7 @@ namespace YARG.Settings.Metadata
         {
             if (_experimentalPreviewUI == null)
             {
-                 _experimentalPreviewUI = Addressables
-                    .LoadAssetAsync<GameObject>("SettingPreviews/ExperimentalPreviewUI")
-                    .WaitForCompletion();
+                 _experimentalPreviewUI = SyncAddressables.Load<GameObject>("SettingPreviews/ExperimentalPreviewUI");
             }
             // Instantiate the warning UI
             Object.Instantiate(_experimentalPreviewUI, uiContainer);

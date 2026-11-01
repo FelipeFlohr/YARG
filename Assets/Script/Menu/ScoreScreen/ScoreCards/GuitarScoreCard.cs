@@ -4,6 +4,7 @@ using UnityEngine.AddressableAssets;
 using YARG.Core;
 using YARG.Core.Engine.Guitar;
 using YARG.Helpers.Extensions;
+using YARG.Helpers;
 
 namespace YARG.Menu.ScoreScreen
 {
@@ -52,9 +53,7 @@ namespace YARG.Menu.ScoreScreen
                     break;
             }
 
-            return Addressables
-                .LoadAssetAsync<Sprite>($"InstrumentIcons[{iconName}]")
-                .WaitForCompletion();
+            return SyncAddressables.Load<Sprite>($"InstrumentIcons[{iconName}]");
         }
     }
 }

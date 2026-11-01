@@ -8,6 +8,7 @@ using YARG.Core;
 using YARG.Helpers.Extensions;
 using YARG.Menu.ListMenu;
 using YARG.Scores;
+using YARG.Helpers;
 
 namespace YARG.Menu.History
 {
@@ -121,7 +122,7 @@ namespace YARG.Menu.History
 
         private void EnableInstrumentIcon(int idx, Instrument instrument)
         {
-            var icon = Addressables.LoadAssetAsync<Sprite>($"InstrumentIcons[{instrument.ToResourceName()}]").WaitForCompletion();
+            var icon = SyncAddressables.Load<Sprite>($"InstrumentIcons[{instrument.ToResourceName()}]");
             _instrumentIcons[idx].sprite = icon;
             _instrumentIcons[idx].enabled = true;
         }

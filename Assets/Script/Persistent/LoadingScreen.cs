@@ -68,7 +68,11 @@ namespace YARG
             }
 
             // Load sources and genre mappings concurrently
-            await UpdateSourcesAndGenres(context);
+            // The web build has no song library to categorize
+            if (!PlatformInfo.IsWeb)
+            {
+                await UpdateSourcesAndGenres(context);
+            }
 
             // Auto connect profiles, using the same order that they were previously connected.
             if (SettingsManager.Settings.ReconnectProfiles.Value)
@@ -90,7 +94,7 @@ namespace YARG
             else
             {
                 var dictText = cmudictAsset.text;
-                await UniTask.RunOnThreadPool(() =>
+                await PlatformTask.Run(() =>
                 {
                     YARG.Core.Chart.LipsyncGenerator.Initialize(dictText);
                     YargLogger.LogInfo("Initialized phoneme dictionary");
@@ -98,7 +102,11 @@ namespace YARG
             }
 
             // Fast scan (cache read) on startup
-            await SongContainer.RunRefresh(true, context);
+            // The web build has no song library to scan
+            if (!PlatformInfo.IsWeb)
+            {
+                await SongContainer.RunRefresh(true, context);
+            }
         }
 
         private static async UniTask UpdateSourcesAndGenres(LoadingContext context)

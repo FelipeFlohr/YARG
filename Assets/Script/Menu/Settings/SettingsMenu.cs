@@ -166,7 +166,7 @@ namespace YARG.Menu.Settings
             foreach (var tab in SettingsManager.AllSettingsTabs.Where(tab => tab is not AllSettingsTab))
             {
                 // Load the tab sprite
-                var sprite = Addressables.LoadAssetAsync<Sprite>($"TabIcons[{tab.Icon}]").WaitForCompletion();
+                var sprite = SyncAddressables.Load<Sprite>($"TabIcons[{tab.Icon}]");
 
                 categories.Add(new CategorySidebar.CategoryInfo(id: tab.Name,
                     displayName: Localize.Key("Settings.Tab", tab.Name), icon: sprite));

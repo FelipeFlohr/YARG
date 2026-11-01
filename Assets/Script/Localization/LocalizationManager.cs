@@ -41,7 +41,7 @@ namespace YARG.Localization
         public static async UniTask LoadLanguage(LoadingContext loadingContext)
         {
             loadingContext.SetLoadingText("Loading language...");
-            await UniTask.RunOnThreadPool(() =>
+            await PlatformTask.Run(() =>
             {
                 // Attempt to load the selected language
                 if (!TryParseAndLoadLanguage(CultureCode))

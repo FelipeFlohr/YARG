@@ -1,3 +1,5 @@
+using System;
+
 namespace YARG.Settings.Metadata
 {
     public sealed class HeaderMetadata : AbstractMetadata
@@ -7,7 +9,8 @@ namespace YARG.Settings.Metadata
         public string HeaderName { get; }
         public bool ShowPreview { get; }
 
-        public HeaderMetadata(string headerName, bool showPreview = false)
+        public HeaderMetadata(string headerName, bool showPreview = false, Func<bool> visibleWhen = null)
+            : base(visibleWhen)
         {
             HeaderName = headerName;
             ShowPreview = showPreview;

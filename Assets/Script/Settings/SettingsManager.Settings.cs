@@ -27,6 +27,7 @@ using YARG.Player;
 using YARG.Scores;
 using YARG.Settings.Metadata;
 using YARG.Settings.Types;
+using YARG.Settings.Web;
 using YARG.Song;
 using YARG.Song.Exporters;
 using YARG.Venue;
@@ -750,6 +751,17 @@ namespace YARG.Settings
                 FileExplorerHelper.OpenFolder(PathHelper.PersistentDataPath);
             }
 
+            public void ExportConfig()
+            {
+                WebConfigTransfer.Export();
+            }
+
+            public void ImportConfig()
+            {
+                // Must stay synchronous: the file picker needs the click's user activation
+                WebConfigTransfer.Import();
+            }
+
             public void OpenExecutablePath()
             {
                 FileExplorerHelper.OpenFolder(PathHelper.ExecutablePath);
@@ -761,7 +773,7 @@ namespace YARG.Settings
                 DialogManager.Instance.ShowConfirmDeleteDialog("Are you sure you want to remove all cached content?\n\nRemote content you access will be redownloaded, possibly causing loading delays.",
                     () =>
                     {
-                        var result = Caching.ClearCache();
+                        var result = PlatformInfo.ClearAssetBundleCache();
                         if (!result)
                         {
                             YargLogger.LogWarning("Failed to clear some cached items.");

@@ -7,6 +7,7 @@ using Cysharp.Threading.Tasks;
 using UnityEngine;
 using YARG.Core.Logging;
 using YARG.Core.Song;
+using YARG.Helpers;
 using YARG.Localization;
 using YARG.Menu.Persistent;
 using YARG.Multiplayer.Protocol;
@@ -55,6 +56,10 @@ namespace YARG.Multiplayer
         private SongEntry    _offeredSong;
         private int          _downloadAttempts;
         private SceneIndex   _lastScene;
+
+        // The session's transport on the web, owned (and disposed) by the session
+        private WebSocketTransport _webTransport;
+        private bool               _webRoomPlaying;
 
 #nullable enable
         public IMultiplayerSession? Session { get; private set; }
@@ -121,6 +126,43 @@ namespace YARG.Multiplayer
             return true;
         }
 
+        /// <summary>
+        /// Web: hosts on a transport that already created its relay room.
+        /// </summary>
+        public void HostWeb(WebSocketTransport transport)
+        {
+            EnsureNoSession();
+
+            var session = new HostSession(transport, CreateConfig(), () => Now);
+            session.Start(ProtocolInfo.DefaultPort);
+
+            Subscribe(session);
+            Session = session;
+            _webTransport = transport;
+            _webRoomPlaying = false;
+            YargLogger.LogFormatInfo("Hosting relay room {0}", transport.RoomId);
+            SessionChanged?.Invoke();
+        }
+
+        /// <summary>
+        /// Web: joins through a transport already accepted into a relay room.
+        /// </summary>
+        public void JoinWeb(WebSocketTransport transport)
+        {
+            EnsureNoSession();
+
+            var session = new ClientSession(transport, CreateConfig(), () => Now);
+            Subscribe(session);
+            session.SongOffered += OnSongOffered;
+            session.SongChunkReceived += OnSongChunkReceived;
+            Session = session;
+            _webTransport = transport;
+
+            YargLogger.LogFormatInfo("Joining relay room {0} as peer {1}", transport.RoomId, transport.LocalPeerId);
+            session.Connect(transport.RoomId, ProtocolInfo.DefaultPort);
+            SessionChanged?.Invoke();
+        }
+
         public void Leave()
         {
             Session?.Leave();
@@ -148,7 +190,7 @@ namespace YARG.Multiplayer
             try
             {
                 // Zipping a big ini folder takes a while; the session must keep ticking meanwhile
-                package = await UniTask.RunOnThreadPool(() => MultiplayerSongLibrary.CreatePackage(song));
+                package = await PlatformTask.Run(() => MultiplayerSongLibrary.CreatePackage(song));
             }
             catch (Exception e) when (e is IOException || e is UnauthorizedAccessException)
             {
@@ -223,9 +265,36 @@ namespace YARG.Multiplayer
                 {
                     YargLogger.LogException(e, "Error while updating the multiplayer session");
                 }
+
+                UpdateWebRoom();
             }
 
             MultiplayerMenuFlow.Update();
+        }
+
+        /// <summary>
+        /// Keeps the relay's room list showing whether the match is on, and ends a hosted session whose socket
+        /// to the relay closed (a client session ends by itself, through its disconnect event).
+        /// </summary>
+        private void UpdateWebRoom()
+        {
+            if (_webTransport == null || Session is not HostSession host)
+            {
+                return;
+            }
+
+            if (_webTransport.IsClosed)
+            {
+                OnSessionEnded(_webTransport.CloseReason);
+                return;
+            }
+
+            bool playing = host.State == SessionState.Loading || host.State == SessionState.Playing;
+            if (playing != _webRoomPlaying)
+            {
+                _webRoomPlaying = playing;
+                _webTransport.SetRoomPlaying(playing);
+            }
         }
 
         private void OnReturnedToMenu()
@@ -280,6 +349,7 @@ namespace YARG.Multiplayer
             MultiplayerGameplay.EndMatch();
             Session.Dispose();
             Session = null;
+            _webTransport = null;
 
             _receiver?.Dispose();
             _receiver = null;

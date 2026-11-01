@@ -8,6 +8,7 @@ using YARG.Core;
 using YARG.Core.Song;
 using YARG.Helpers.Extensions;
 using YARG.Settings;
+using YARG.Helpers;
 
 namespace YARG.Menu.MusicLibrary
 {
@@ -233,7 +234,7 @@ namespace YARG.Menu.MusicLibrary
             string assetKey = $"InstrumentIcons[{assetName}]";
             if (!ICON_CACHE.TryGetValue(assetKey, out var icon))
             {
-                ICON_CACHE[assetKey] = icon = Addressables.LoadAssetAsync<Sprite>(assetKey).WaitForCompletion();
+                ICON_CACHE[assetKey] = icon = SyncAddressables.Load<Sprite>(assetKey);
             }
 
             return icon;

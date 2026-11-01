@@ -1,0 +1,113 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+  color: #fff;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+#unity-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  background: #000;
+  outline: none;
+}
+
+#yarg-loading {
+  position: fixed;
+  left: 50%;
+  bottom: 12%;
+  transform: translateX(-50%);
+  width: min(480px, 80vw);
+  text-align: center;
+  z-index: 1;
+}
+
+#yarg-loading-title {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  letter-spacing: 0.05em;
+}
+
+#yarg-progress {
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.15);
+  overflow: hidden;
+}
+
+#yarg-progress-fill {
+  width: 0;
+  height: 100%;
+  background: #4fc3f7;
+  transition: width 0.2s linear;
+}
+
+#yarg-start {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  cursor: pointer;
+  z-index: 2;
+  user-select: none;
+}
+
+#yarg-start-text {
+  font-size: 28px;
+  font-weight: 600;
+  padding: 16px 32px;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  border-radius: 8px;
+}
+
+#yarg-error {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 3;
+}
+
+#yarg-error-box {
+  max-width: min(560px, 90vw);
+  padding: 24px;
+  border-radius: 8px;
+  background: #1e1e1e;
+  text-align: center;
+}
+
+#yarg-error-title {
+  font-size: 22px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+#yarg-error-message {
+  font-size: 14px;
+  margin-bottom: 20px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  opacity: 0.85;
+}
+
+#yarg-error-reload {
+  font-size: 16px;
+  padding: 8px 24px;
+  border: none;
+  border-radius: 4px;
+  background: #4fc3f7;
+  color: #000;
+  cursor: pointer;
+}

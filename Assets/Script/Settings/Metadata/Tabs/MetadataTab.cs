@@ -8,6 +8,7 @@ using YARG.Localization;
 using YARG.Menu.Navigation;
 using YARG.Menu.Settings;
 using YARG.Menu.Settings.Visuals;
+using YARG.Helpers;
 
 namespace YARG.Settings.Metadata
 {
@@ -54,9 +55,7 @@ namespace YARG.Settings.Metadata
                     {
                         if (_buttonPrefab == null)
                         {
-                            _buttonPrefab = Addressables
-                                .LoadAssetAsync<GameObject>("SettingTab/Button")
-                                .WaitForCompletion();
+                            _buttonPrefab = SyncAddressables.Load<GameObject>("SettingTab/Button");
                         }
                         // Spawn the button
                         var go = Object.Instantiate(_buttonPrefab, container);
@@ -71,9 +70,7 @@ namespace YARG.Settings.Metadata
                     {
                         if (_textPrefab == null)
                         {
-                            _textPrefab = Addressables
-                                .LoadAssetAsync<GameObject>("SettingTab/Text")
-                                .WaitForCompletion();
+                            _textPrefab = SyncAddressables.Load<GameObject>("SettingTab/Text");
                         }
                         // Spawn in the header
                         var go = Object.Instantiate(_textPrefab, container);
@@ -157,6 +154,52 @@ namespace YARG.Settings.Metadata
                 pair.Value.SetEditable(setting.IsEditable);
                 pair.Value.RefreshVisual();
             }
+        }
+
+        /// <summary>
+        /// Removes the entries matching <paramref name="shouldRemove"/>, and then the headers that lost all of
+        /// their entries because of it. Headers that were already empty are kept (they host previews).
+        /// </summary>
+        public void RemoveWhere(System.Func<AbstractMetadata, bool> shouldRemove)
+        {
+            var kept = new List<AbstractMetadata>();
+            HeaderMetadata header = null;
+            bool headerLostEntries = false;
+            int headerEntries = 0;
+
+            void Flush()
+            {
+                if (header != null && !(headerLostEntries && headerEntries == 0))
+                {
+                    kept.Insert(kept.Count - headerEntries, header);
+                }
+            }
+
+            foreach (var metadata in _settings)
+            {
+                if (metadata is HeaderMetadata next)
+                {
+                    Flush();
+                    header = next;
+                    headerLostEntries = false;
+                    headerEntries = 0;
+                }
+                else if (shouldRemove(metadata))
+                {
+                    headerLostEntries = true;
+                }
+                else
+                {
+                    kept.Add(metadata);
+                    headerEntries++;
+                }
+            }
+
+            Flush();
+
+            _settings.Clear();
+            _settings.AddRange(kept);
+            _sectionsCache = null;
         }
 
         // For collection initializer support

@@ -212,9 +212,7 @@ namespace YARG.Settings.Metadata
         {
             if (_careerSubHeaderPrefab == null)
             {
-                _careerSubHeaderPrefab = Addressables
-                    .LoadAssetAsync<GameObject>("SettingTab/CareerSubHeader")
-                    .WaitForCompletion();
+                _careerSubHeaderPrefab = SyncAddressables.Load<GameObject>("SettingTab/CareerSubHeader");
             }
 
             var go = Object.Instantiate(_careerSubHeaderPrefab, container);
@@ -545,8 +543,7 @@ namespace YARG.Settings.Metadata
         {
             if (_careerInfoPrefab == null)
             {
-                _careerInfoPrefab = Addressables.LoadAssetAsync<GameObject>("SettingTab/CareerHeader")
-                    .WaitForCompletion();
+                _careerInfoPrefab = SyncAddressables.Load<GameObject>("SettingTab/CareerHeader");
             }
 
             var go = Object.Instantiate(_careerInfoPrefab, container);
@@ -564,7 +561,7 @@ namespace YARG.Settings.Metadata
             if (_careerTierPrefab == null)
             {
                 _careerTierPrefab =
-                    Addressables.LoadAssetAsync<GameObject>("SettingTab/CareerTier").WaitForCompletion();
+                    SyncAddressables.Load<GameObject>("SettingTab/CareerTier");
             }
 
             var go = Object.Instantiate(_careerTierPrefab, container);
@@ -582,7 +579,7 @@ namespace YARG.Settings.Metadata
             if (_careerSongPrefab == null)
             {
                 _careerSongPrefab =
-                    Addressables.LoadAssetAsync<GameObject>("SettingTab/CareerSong").WaitForCompletion();
+                    SyncAddressables.Load<GameObject>("SettingTab/CareerSong");
             }
 
             var go = Object.Instantiate(_careerSongPrefab, container);

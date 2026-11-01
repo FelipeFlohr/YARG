@@ -159,9 +159,7 @@ namespace YARG.Settings.Metadata
         {
             if (_trackPreview == null)
             {
-                 _trackPreview = Addressables
-                    .LoadAssetAsync<GameObject>("SettingPreviews/TrackPreview")
-                    .WaitForCompletion();
+                 _trackPreview = SyncAddressables.Load<GameObject>("SettingPreviews/TrackPreview");
             }
             var trackObj = Object.Instantiate(_trackPreview, worldContainer);
             var trackPreview = trackObj.GetComponentInChildren<FakeTrackPlayer>();
@@ -186,9 +184,7 @@ namespace YARG.Settings.Metadata
         {
             if (_trackPreviewUI == null)
             {
-                _trackPreviewUI = Addressables
-                    .LoadAssetAsync<GameObject>("SettingPreviews/TrackPreviewUI")
-                    .WaitForCompletion();
+                _trackPreviewUI = SyncAddressables.Load<GameObject>("SettingPreviews/TrackPreviewUI");
             }
             if (UI != null)
             {

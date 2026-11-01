@@ -11,6 +11,7 @@ using YARG.Core.Engine;
 using YARG.Core.Logging;
 using YARG.Core.Replays;
 using YARG.Gameplay.HUD;
+using YARG.Helpers;
 using YARG.Gameplay.Player;
 using YARG.Localization;
 using YARG.Menu;
@@ -174,9 +175,10 @@ namespace YARG.Gameplay
                 }
             }
 
-            context.Queue(UniTask.RunOnThreadPool(LoadChart), "Loading chart...");
-            context.Queue(UniTask.RunOnThreadPool(LoadAudio), "Loading audio...");
+            context.Queue(PlatformTask.Run(LoadChart), "Loading chart...");
+            context.Queue(PlatformTask.Run(LoadAudio), "Loading audio...");
             await context.Wait();
+            await WaitForDeferredAudio(context);
 
             if (_loadState == LoadFailureState.Rescan)
             {

@@ -3,7 +3,11 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+#if UNITY_WEBGL && !UNITY_EDITOR
+using YARG.Audio.Web;
+#else
 using YARG.Audio.BASS;
+#endif
 using YARG.Core.Logging;
 using YARG.Core.Audio;
 using YARG.Helpers;
@@ -18,6 +22,7 @@ using YARG.Replays;
 using YARG.Scores;
 using YARG.Settings;
 using YARG.Settings.Customization;
+using YARG.Settings.Web;
 
 namespace YARG
 {
@@ -84,6 +89,11 @@ namespace YARG
 
             // Initialize important classes
 
+            WebConfigStore.Restore();
+            if (PlatformInfo.IsWeb)
+            {
+                WebConfigTransfer.Initialize();
+            }
             ReplayContainer.Init();
             ScoreContainer.Init();
             PlaylistContainer.Initialize();
@@ -99,7 +109,11 @@ namespace YARG
             YargLogger.LogFormatInfo("Saved {0} profiles", savedCount);
 
             SettingsManager.LoadStartupSettings();
+#if UNITY_WEBGL && !UNITY_EDITOR
+            GlobalAudioHandler.Initialize<WebAudioManager>();
+#else
             GlobalAudioHandler.Initialize<BassAudioManager>();
+#endif
 
             Players = new List<YargPlayer>();
 
@@ -108,10 +122,13 @@ namespace YARG
             Shader.SetGlobalFloat("_IsFading", 1f);
         }
 
-        private void Start()
+        private async void Start()
         {
             SettingsManager.LoadSettings();
             InputManager.Initialize();
+
+            // On the web, synchronous Addressables loads only work on preloaded assets
+            await SyncAddressables.PreloadAsync();
 
             LoadScene(SceneIndex.Menu);
         }
@@ -124,6 +141,12 @@ namespace YARG
         private void Update()
         {
             GlobalAudioHandler.Update();
+
+            // Without a logger thread (web), the queue is drained here
+            if (!YargLogger.HasOutputThread)
+            {
+                YargLogger.FlushLogQueue();
+            }
 
 #if UNITY_EDITOR
             bool muted = UnityEditor.EditorUtility.audioMasterMute;

@@ -10,6 +10,7 @@ using YARG.Core;
 using YARG.Core.Input;
 using YARG.Core.Song;
 using YARG.Core.Utility;
+using YARG.Helpers;
 using YARG.Helpers.Extensions;
 using YARG.Menu.Navigation;
 using YARG.Menu.Persistent;
@@ -581,7 +582,7 @@ namespace YARG.Menu.MusicLibrary
             // We explicity don't use the cancellation token here as we need control to resume
             // in *this method* to ensure that image gets disposed since it is backed by a FixedArray
             // ReSharper disable once MethodSupportsCancellation
-            using var image = await UniTask.RunOnThreadPool(songEntry.LoadAlbumData);
+            using var image = await PlatformTask.Run(songEntry.LoadAlbumData);
             if (image != null)
             {
                 texture = image.LoadTexture(false);

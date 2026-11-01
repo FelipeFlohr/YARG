@@ -20,6 +20,7 @@ using YARG.Menu.Filters;
 using YARG.Menu.Persistent;
 using YARG.Menu.ProfileList;
 using YARG.Settings;
+using YARG.Settings.Web;
 using YARG.Song;
 
 namespace YARG.Player
@@ -34,6 +35,7 @@ namespace YARG.Player
     {
         public  static string ProfilesDirectory => Path.Combine(PathHelper.PersistentDataPath, "profiles");
         private static string ProfilesPath      => Path.Combine(ProfilesDirectory, "profiles.json");
+        internal static string ProfilesFilePath => ProfilesPath;
         private static string ProfilesBackupPath => Path.Combine(ProfilesDirectory, "profiles.json.bak");
         private static string UnloadedProfilesPath => Path.Combine(ProfilesDirectory, "profiles.json.unloaded");
 
@@ -365,6 +367,28 @@ namespace YARG.Player
 
             /// <summary>Whether the file was read and parsed as a JSON array (even an empty one).</summary>
             public bool StructurallyReadable;
+        }
+
+        /// <summary>
+        /// Whether <paramref name="json"/> is a non-empty profile array in which every record loads, without
+        /// registering anything. Used to validate imports before replacing the stored profiles.
+        /// </summary>
+        public static bool CanLoadProfiles(string json)
+        {
+            try
+            {
+                if (JToken.Parse(json) is not JArray { Count: > 0 } array)
+                {
+                    return false;
+                }
+
+                return array.All(token => token is JObject && token.ToObject<YargProfile>() != null);
+            }
+            catch (Exception e)
+            {
+                YargLogger.LogFormatWarning("Imported profiles are invalid: {0}", e.Message);
+                return false;
+            }
         }
 
         public static int LoadProfiles()
@@ -758,6 +782,7 @@ namespace YARG.Player
             }
 
             File.Move(tempPath, ProfilesPath);
+            WebConfigStore.Persist(WebConfigFile.Profiles);
 
             BindingsContainer.SaveBindings();
 

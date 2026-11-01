@@ -8,6 +8,7 @@ using UnityEngine.InputSystem.Layouts;
 using UnityEngine.InputSystem.LowLevel;
 using YARG.Core.Input;
 using YARG.Core.Logging;
+using YARG.Helpers;
 using YARG.Menu.Navigation;
 using YARG.Menu.Persistent;
 using YARG.Player;
@@ -82,7 +83,7 @@ namespace YARG.Input
             _defaultKeyboardMenuBindings = new DefaultKeyboardMenuBindings();
 
             // Notify of all current devices
-            ToastManager.ToastInformation("Devices found: " + (Microphone.devices.Length + InputSystem.devices.Count));
+            ToastManager.ToastInformation("Devices found: " + (PlatformInfo.UnityMicrophoneCount + InputSystem.devices.Count));
             foreach (var device in InputSystem.devices)
             {
                 if (!device.enabled)

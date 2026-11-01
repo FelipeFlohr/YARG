@@ -84,7 +84,7 @@ namespace Editor
         /// for shader graphs imported after it loaded. On a fresh or updated Library they can be imported before
         /// that and draw notes with the plain camera projection, squeezed into the middle of the highway.
         /// </summary>
-        private static void ReimportShaderGraphs()
+        internal static void ReimportShaderGraphs()
         {
             int count = 0;
             foreach (string guid in AssetDatabase.FindAssets("t:Shader", new[] { "Assets" }))

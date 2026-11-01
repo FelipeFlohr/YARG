@@ -3,6 +3,7 @@ using UnityEngine.AddressableAssets;
 using YARG.Menu.Navigation;
 using YARG.Menu.Settings;
 using YARG.Menu.Settings.AllSettings;
+using YARG.Helpers;
 
 namespace YARG.Settings.Metadata
 {
@@ -18,9 +19,7 @@ namespace YARG.Settings.Metadata
         {
             if (_searchResultPopulator == null)
             {
-                _searchResultPopulator = Addressables
-                    .LoadAssetAsync<GameObject>("SettingTab/SearchResultPopulator")
-                    .WaitForCompletion();
+                _searchResultPopulator = SyncAddressables.Load<GameObject>("SettingTab/SearchResultPopulator");
             }
 
             var gameObject = Object.Instantiate(_searchResultPopulator, settingContainer);

@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
 using YARG.Core.Logging;
+using YARG.Helpers;
 using YARG.Gameplay.Visuals;
 using YARG.Settings.Customization;
 
@@ -19,8 +20,11 @@ namespace YARG.Themes
         private readonly Dictionary<ThemePreset, ThemeContainer> _themeContainers = new();
         private ThemeContainer _defaultTheme;
 
-        private void Start()
+        private async void Start()
         {
+            // The built-in themes are synchronous Addressables loads, preloaded on the web
+            await SyncAddressables.WhenReady;
+
             // Populate all of the default themes
             foreach (var defaultPreset in ThemePreset.Defaults)
             {

@@ -190,6 +190,7 @@ namespace YARG.Gameplay
 
         private double _lastMultiplayerPausePress = double.NegativeInfinity;
         private bool   _multiplayerEnding;
+        private bool   _resultsShown;
 
         // Final stats the remote players sent, by multiplayer player id
         private IReadOnlyDictionary<int, ReplayFrame> _remoteFinalFrames;
@@ -689,6 +690,13 @@ namespace YARG.Gameplay
 
         private bool EndSong()
         {
+            // The scene keeps updating until the score screen replaces it; showing the results again would save the
+            // replay twice and unload the scene twice
+            if (_resultsShown)
+            {
+                return true;
+            }
+
             _crowdClapScheduler?.Dispose();
             // Dispose the crowd handler
             CrowdEventHandler?.Dispose();
@@ -785,6 +793,8 @@ namespace YARG.Gameplay
 
         private void ShowResults()
         {
+            _resultsShown = true;
+
 #nullable enable
             ReplayInfo? replayInfo = null;
 #nullable disable

@@ -1,4 +1,24 @@
 {
+    "WebSong": {
+        "Play": "Play",
+        "PlayAgain": "Play again",
+        "LoadFile": "Load song...",
+        "LoadAnother": "Load another",
+        "LoadFolder": "Load folder...",
+        "Hint": "Pick a .sng or .zip file, or a song folder (song.ini, notes.mid or notes.chart and the audio). You can also drag it onto the page.",
+        "Picking": "Choose the song in your browser...",
+        "NoPlayers": "Add a player first: Profiles in the main menu.",
+        "NoParts": "No playable parts",
+        "Charter": "Charted by {0}",
+        "Error": {
+            "UnsupportedFormat": "Unsupported format. Use a .sng, a .zip or a song folder (CON files are not supported).",
+            "NoChart": "No chart found: the song needs a song.ini with notes.mid or notes.chart.",
+            "NoAudio": "This song has no audio.",
+            "ParseFailed": "Could not read the chart: {0}",
+            "TooLarge": "The song is larger than 300 MB.",
+            "ReadFailed": "Could not read the files."
+        }
+    },
     "Language": {
         "Name": "English",
         "Region": "United States",
@@ -348,6 +368,31 @@
             "PressAgainToLeave": "Press pause again to leave the match.",
             "WaitingForPlayers": "Waiting for the other players: {0}",
             "WaitingForPlayersToFinish": "Waiting for the other players to finish: {0}",
+            "Web": {
+                "Rooms": "Online Rooms",
+                "NoRooms": "No rooms yet. Create one!",
+                "Room": "🔒 {0}  {1}/{2}",
+                "InMatch": " (in a match)",
+                "CreateRoom": "Create Room",
+                "Refresh": "Refresh",
+                "RoomName": "Room name",
+                "RoomPassword": "Room password",
+                "MaxPlayers": "Maximum players",
+                "Players": "{0} players",
+                "JoinPassword": "Password for {0}",
+                "PickSong": "Choose Song...",
+                "SongLoadFailed": "Could not load the song: {0}",
+                "Error": {
+                    "wrong_password": "Wrong password.",
+                    "full": "The room is full.",
+                    "not_found": "The room no longer exists.",
+                    "rate_limited": "Too many wrong passwords. Wait a minute and try again.",
+                    "too_large": "The server refused a message that was too large.",
+                    "too_many_rooms": "You already have too many open rooms.",
+                    "connection_lost": "Could not reach the server: {0}",
+                    "Other": "The server refused the request: {0}"
+                }
+            },
             "Status": {
                 "Idle": "Waiting",
                 "MissingSong": "Missing song",
@@ -1200,7 +1245,8 @@
             "Accessibility": "Accessibility",
             "CareerInformation": "Career Information",
             "CareerTiers": "Career Tiers",
-            "NoTiers": "  (No tiers created. Click '+ Add Tier' above)"
+            "NoTiers": "  (No tiers created. Click '+ Add Tier' above)",
+            "WebConfig": "Settings Backup"
         },
         "Button": {
             "ChooseMultiplayerSongsFolder": "Choose Downloaded Songs Folder",
@@ -1217,7 +1263,9 @@
             "OpenExecutablePath": "Open Executable Path",
             "OpenPersistentDataPath": "Open Persistent Data Path",
             "RemoveRemoteContent": "Remove Cached Content",
-            "OpenAsioControlPanel": "Open ASIO Control Panel"
+            "OpenAsioControlPanel": "Open ASIO Control Panel",
+            "ExportConfig": "Export Settings and Profiles",
+            "ImportConfig": "Import Settings and Profiles"
         },
         "Setting": {
             "SaveMultiplayerSongs": {
@@ -2816,5 +2864,9 @@
                 }
 			}
         }
+    },
+    "Web": {
+        "ConfigNotSaved": "Your browser is blocking storage. Settings will not be saved.",
+        "ImportInvalid": "That file is not a YARG settings backup."
     }
 }

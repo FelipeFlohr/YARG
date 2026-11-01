@@ -6,6 +6,7 @@ using UnityEngine.UI;
 using YARG.Menu.Navigation;
 using YARG.Menu.Settings.Visuals;
 using YARG.Settings.Types;
+using YARG.Helpers;
 
 namespace YARG.Settings.Metadata
 {
@@ -82,8 +83,7 @@ namespace YARG.Settings.Metadata
         protected static BaseSettingVisual SpawnSettingVisual(ISettingType setting, Transform container)
         {
             // Spawn the setting
-            var settingPrefab = Addressables.LoadAssetAsync<GameObject>(setting.AddressableName)
-                .WaitForCompletion();
+            var settingPrefab = SyncAddressables.Load<GameObject>(setting.AddressableName);
             var go = Object.Instantiate(settingPrefab, container);
 
             // Set the setting, and cache the object

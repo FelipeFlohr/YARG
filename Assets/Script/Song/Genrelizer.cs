@@ -695,8 +695,20 @@ namespace YARG.Song
 
         private static string _sanitize(string subgenre)
         {
-            var textInfo = new CultureInfo(Localization.LocalizationManager.CultureCode).TextInfo;
-            return textInfo.ToTitleCase(subgenre.Trim());
+            return GetTextInfo().ToTitleCase(subgenre.Trim());
+        }
+
+        private static TextInfo GetTextInfo()
+        {
+            try
+            {
+                return new CultureInfo(Localization.LocalizationManager.CultureCode).TextInfo;
+            }
+            catch (Exception)
+            {
+                // The web build has no culture data (CultureInfo throws there)
+                return CultureInfo.InvariantCulture.TextInfo;
+            }
         }
     }
 

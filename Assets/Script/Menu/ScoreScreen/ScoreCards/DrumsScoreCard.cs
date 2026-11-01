@@ -5,6 +5,7 @@ using YARG.Core;
 using YARG.Core.Engine.Drums;
 using YARG.Input;
 using YARG.Localization;
+using YARG.Helpers;
 
 namespace YARG.Menu.ScoreScreen
 {
@@ -34,9 +35,7 @@ namespace YARG.Menu.ScoreScreen
             }
         }
 
-        public override Sprite GetInstrumentSprite() => Addressables
-                .LoadAssetAsync<Sprite>("InstrumentIcons[drums]")
-                .WaitForCompletion();
+        public override Sprite GetInstrumentSprite() => SyncAddressables.Load<Sprite>("InstrumentIcons[drums]");
 
         private void CreateOverhitRow(ControlBinding binding, int count, Transform parent)
         {

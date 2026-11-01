@@ -570,6 +570,9 @@ PlayerSettings:
   - m_BuildTarget: Standalone
     m_StaticBatching: 1
     m_DynamicBatching: 0
+  - m_BuildTarget: WebGL
+    m_StaticBatching: 0
+    m_DynamicBatching: 0
   m_BuildTargetShaderSettings: []
   m_BuildTargetGraphicsJobs: []
   m_BuildTargetGraphicsJobMode: []
@@ -851,7 +854,7 @@ PlayerSettings:
   webGLDebugSymbols: 0
   webGLEmscriptenArgs: 
   webGLModulesDirectory: 
-  webGLTemplate: APPLICATION:Default
+  webGLTemplate: PROJECT:YARG
   webGLAnalyzeBuildSize: 0
   webGLUseEmbeddedResources: 0
   webGLCompressionFormat: 0
@@ -880,7 +883,7 @@ PlayerSettings:
     QNX: ENABLE_JSON_CATALOG
     Server: ENABLE_JSON_CATALOG
     Standalone: ENABLE_JSON_CATALOG;ZSTRING_TEXTMESHPRO_SUPPORT
-    WebGL: ENABLE_JSON_CATALOG
+    WebGL: ENABLE_JSON_CATALOG;ZSTRING_TEXTMESHPRO_SUPPORT
     Windows Store Apps: ENABLE_JSON_CATALOG
     XboxOne: ENABLE_JSON_CATALOG
     iPhone: ENABLE_JSON_CATALOG

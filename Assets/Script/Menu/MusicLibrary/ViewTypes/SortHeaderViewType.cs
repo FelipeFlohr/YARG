@@ -110,7 +110,7 @@ namespace YARG.Menu.MusicLibrary
             string assetKey = Collapsed ? "MusicLibraryIcons[Right]" : "MusicLibraryIcons[Down]";
             if (!IconCache.TryGetValue(assetKey, out var icon))
             {
-                IconCache[assetKey] = icon = Addressables.LoadAssetAsync<Sprite>(assetKey).WaitForCompletion();
+                IconCache[assetKey] = icon = SyncAddressables.Load<Sprite>(assetKey);
             }
 
             return icon;

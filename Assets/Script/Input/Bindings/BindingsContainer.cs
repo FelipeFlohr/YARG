@@ -6,6 +6,7 @@ using YARG.Core.Game;
 using YARG.Core.Logging;
 using YARG.Input.Serialization;
 using YARG.Player;
+using YARG.Settings.Web;
 
 namespace YARG.Input.Bindings
 {
@@ -15,6 +16,7 @@ namespace YARG.Input.Bindings
     public static class BindingsContainer
     {
         private static string BindingsPath => Path.Combine(PlayerContainer.ProfilesDirectory, "bindings.json");
+        internal static string BindingsFilePath => BindingsPath;
         private static string BindingsBackupPath => Path.Combine(PlayerContainer.ProfilesDirectory, "bindings.json.bak");
 
         private static readonly Dictionary<Guid, ProfileBindings> _bindings = new();
@@ -100,6 +102,10 @@ namespace YARG.Input.Bindings
             }
 
             BindingSerialization.SerializeBindings(serialized, path);
+            if (path == BindingsPath)
+            {
+                WebConfigStore.Persist(WebConfigFile.Bindings);
+            }
             return _bindings.Count;
         }
 

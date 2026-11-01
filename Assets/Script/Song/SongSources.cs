@@ -70,7 +70,8 @@ namespace YARG.Song
 
             public string GetDisplayName()
             {
-                return _names["en-US"];
+                // The web build loads no source list, so the default source has no names there
+                return _names != null && _names.TryGetValue("en-US", out string name) ? name : IconName;
             }
 
             public async void LoadSprite()
@@ -89,7 +90,7 @@ namespace YARG.Song
                     string file = Path.Combine(root, $"{IconName}.png");
                     if (File.Exists(file))
                     {
-                        using var image = await UniTask.RunOnThreadPool(() => YARGImage.Load(file));
+                        using var image = await PlatformTask.Run(() => YARGImage.Load(file));
                         if (image == null)
                         {
                             YargLogger.LogFormatWarning("Failed to load source icon `{0}`!", file);
@@ -145,7 +146,18 @@ namespace YARG.Song
 
         private static readonly Dictionary<string, ParsedSource> _sources = new(StringComparer.OrdinalIgnoreCase);
         private static ParsedSource _default;
-        public static ParsedSource Default => _default;
+        public static ParsedSource Default
+        {
+            get
+            {
+                // The web build loads no source list
+                if (_default == null)
+                {
+                    CreateBackupSource();
+                }
+                return _default;
+            }
+        }
 
         public static async UniTask LoadSources()
         {
@@ -380,7 +392,7 @@ namespace YARG.Song
             {
                 { "en-US", "Unknown" }
             }, SourceType.Custom);
-            _sources.Add(DEFAULT_KEY, _default);
+            _sources[DEFAULT_KEY] = _default;
         }
 
         public static bool TryGetSource(string id, out ParsedSource parsedSource)
@@ -392,7 +404,7 @@ namespace YARG.Song
         {
             if (!TryGetSource(id, out var parsedSource))
             {
-                parsedSource = _default;
+                parsedSource = Default;
             }
             return parsedSource;
         }

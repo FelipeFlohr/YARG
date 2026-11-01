@@ -12,6 +12,7 @@ using YARG.Helpers;
 using YARG.Menu.Filters;
 using YARG.Settings.Metadata;
 using YARG.Settings.Types;
+using YARG.Settings.Web;
 
 namespace YARG.Settings
 {
@@ -99,6 +100,12 @@ namespace YARG.Settings
                 nameof(Settings.SaveMultiplayerSongs),
                 new ButtonRowMetadata(nameof(Settings.ChooseMultiplayerSongsFolder)),
                 nameof(Settings.MultiplayerRemoteDelayMs),
+
+                new HeaderMetadata("WebConfig", visibleWhen: () => PlatformInfo.IsWeb),
+                new ButtonRowMetadata(
+                    () => PlatformInfo.IsWeb,
+                    nameof(Settings.ExportConfig),
+                    nameof(Settings.ImportConfig)),
             },
             new SongManagerTab("SongManager", icon: "Songs")
             {
@@ -317,12 +324,76 @@ namespace YARG.Settings
             }
         };
 
+        private static readonly string[] WebHiddenTabs =
+        {
+            "SongManager",
+            "FileManagement",
+            "LightingPeripherals",
+        };
+
+        private static readonly string[] WebHiddenSettings =
+        {
+            nameof(SettingContainer.OpenVenueFolder),
+            nameof(SettingContainer.DisableDefaultBackground),
+            nameof(SettingContainer.DisableGlobalBackgrounds),
+            nameof(SettingContainer.DisablePerSongBackgrounds),
+            nameof(SettingContainer.WaitForSongVideo),
+            nameof(SettingContainer.AllowRemoteContent),
+            nameof(SettingContainer.DiscordRichPresence),
+            nameof(SettingContainer.SaveMultiplayerSongs),
+            nameof(SettingContainer.ChooseMultiplayerSongsFolder),
+            nameof(SettingContainer.OutputMode),
+            nameof(SettingContainer.OutputDevice),
+            nameof(SettingContainer.AsioBufferSize),
+            nameof(SettingContainer.OpenAsioControlPanel),
+        };
+
+        // Matches OutputChannelDefault, OutputChannelSfx, ...
+        private const string WEB_HIDDEN_SETTING_PREFIX = "OutputChannel";
+
         static SettingsManager()
         {
             AllSettingsTabs.InsertRange(0, DisplayedSettingsTabs);
+
+            if (PlatformInfo.IsWeb)
+            {
+                RemoveWebHiddenSettings();
+            }
+        }
+
+        /// <summary>
+        /// The web build has no song folders, venues, audio devices or lighting peripherals, so the
+        /// settings that configure them are removed instead of shown as dead controls.
+        /// </summary>
+        private static void RemoveWebHiddenSettings()
+        {
+            DisplayedSettingsTabs.RemoveAll(tab => WebHiddenTabs.Contains(tab.Name));
+            AllSettingsTabs.RemoveAll(tab => WebHiddenTabs.Contains(tab.Name));
+
+            foreach (var tab in AllSettingsTabs.OfType<MetadataTab>())
+            {
+                tab.RemoveWhere(IsWebHidden);
+            }
+
+            static bool IsWebHidden(AbstractMetadata metadata)
+            {
+                return metadata switch
+                {
+                    FieldMetadata field => IsHiddenName(field.FieldName),
+                    ButtonRowMetadata row => row.Buttons.All(IsHiddenName),
+                    _ => false,
+                };
+            }
+
+            static bool IsHiddenName(string name)
+            {
+                return WebHiddenSettings.Contains(name) || name.StartsWith(WEB_HIDDEN_SETTING_PREFIX, StringComparison.Ordinal);
+            }
         }
 
         private static string SettingsFile => Path.Combine(PathHelper.PersistentDataPath, "settings.json");
+
+        internal static string SettingsFilePath => SettingsFile;
 
         public static void LoadStartupSettings()
         {
@@ -336,6 +407,31 @@ namespace YARG.Settings
             {
                 // Full settings load reports file and JSON errors during normal startup.
                 OutputDeviceAtStartup = "Default";
+            }
+        }
+
+        /// <summary>
+        /// Whether <paramref name="json"/> is a settings file that <see cref="LoadSettings"/> would accept,
+        /// written by YARG (it carries the schema version). Used to validate imports before replacing anything.
+        /// </summary>
+        public static bool CanLoadSettings(string json)
+        {
+            try
+            {
+                var settingsJson = JObject.Parse(json);
+                if (settingsJson[SettingsMigration.SETTINGS_SCHEMA_VERSION_PROPERTY] is not { Type: JTokenType.Integer })
+                {
+                    return false;
+                }
+
+                settingsJson = SettingsMigration.Migrate(settingsJson, out bool canSave);
+                return canSave && JsonConvert.DeserializeObject<SettingContainer>(
+                    settingsJson.ToString(Formatting.None), JsonSettings) != null;
+            }
+            catch (Exception e)
+            {
+                YargLogger.LogFormatWarning("Imported settings are invalid: {0}", e.Message);
+                return false;
             }
         }
 
@@ -363,11 +459,27 @@ namespace YARG.Settings
             catch (Exception e)
             {
                 _settingsCanBeSaved = !settingsFileExists;
-                YargLogger.LogException(e, "Failed to load settings!");
+                if (PlatformInfo.IsWeb && !settingsFileExists)
+                {
+                    // First visit: nothing was stored in the browser yet, which is not an error
+                    YargLogger.LogInfo("No stored settings found, using the defaults");
+                }
+                else
+                {
+                    YargLogger.LogException(e, "Failed to load settings!");
+                }
             }
 
             // If null, recreate
             Settings ??= new SettingContainer();
+
+            if (PlatformInfo.IsWeb)
+            {
+                // The web build has no venue backgrounds to load
+                Settings.DisableDefaultBackground.SetValueWithoutNotify(true);
+                Settings.DisableGlobalBackgrounds.SetValueWithoutNotify(true);
+                Settings.DisablePerSongBackgrounds.SetValueWithoutNotify(true);
+            }
 
             AudioOutputMode outputMode = GlobalAudioHandler.GetOutputMode(Settings.OutputDevice.Value);
             Settings.OutputMode.SetValueWithoutNotify(outputMode);
@@ -390,6 +502,12 @@ namespace YARG.Settings
 
                 settingType.ForceInvokeCallback();
             }
+
+            if (PlatformInfo.IsWeb && !settingsFileExists)
+            {
+                // Mirror the defaults to the browser right away, so the stored copy exists from the first visit
+                SaveSettings();
+            }
         }
 
         public static void SaveSettings()
@@ -402,6 +520,7 @@ namespace YARG.Settings
                 var json = JObject.Parse(JsonConvert.SerializeObject(Settings, JsonSettings));
                 SettingsMigration.SetCurrentSchemaVersion(json);
                 File.WriteAllText(SettingsFile, json.ToString(Formatting.Indented));
+                WebConfigStore.Persist(WebConfigFile.Settings);
             }
         }
 

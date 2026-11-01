@@ -10,6 +10,7 @@ using YARG.Core.Game;
 using YARG.Core.Logging;
 using YARG.Helpers.Extensions;
 using YARG.Settings;
+using YARG.Helpers;
 
 namespace YARG.Gameplay.HUD
 {
@@ -155,7 +156,7 @@ namespace YARG.Gameplay.HUD
                 var handleImage = _playerSliders[i].handleRect.GetComponentInChildren<Image>();
                 var spriteName = _players[i].GetInstrumentSprite(_gameManager.Song);
 
-                var sprite = Addressables.LoadAssetAsync<Sprite>(spriteName).WaitForCompletion();
+                var sprite = SyncAddressables.Load<Sprite>(spriteName);
                 handleImage.sprite = sprite;
                 handleImage.color = _players[i].GetGameplayIconColor();
 

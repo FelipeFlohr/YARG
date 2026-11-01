@@ -3,6 +3,7 @@ using UnityEngine.AddressableAssets;
 using UnityEngine.UI;
 using YARG.Menu.Navigation;
 using YARG.Menu.Settings;
+using YARG.Helpers;
 
 namespace YARG.Settings.Metadata
 {
@@ -28,15 +29,11 @@ namespace YARG.Settings.Metadata
 
             if (_songManagerHeader == null)
             {
-                 _songManagerHeader = Addressables
-                    .LoadAssetAsync<GameObject>("SettingTab/SongManagerHeader")
-                    .WaitForCompletion();
+                 _songManagerHeader = SyncAddressables.Load<GameObject>("SettingTab/SongManagerHeader");
             }
             if (_songManagerDirectory == null)
             {
-                 _songManagerDirectory = Addressables
-                    .LoadAssetAsync<GameObject>("SettingTab/SongManagerDirectory")
-                    .WaitForCompletion();
+                 _songManagerDirectory = SyncAddressables.Load<GameObject>("SettingTab/SongManagerDirectory");
             }
 
             // Spawn in the special header

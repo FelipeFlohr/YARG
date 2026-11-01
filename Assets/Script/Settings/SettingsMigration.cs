@@ -8,7 +8,7 @@ namespace YARG.Settings
     {
         internal const int CURRENT_SETTINGS_SCHEMA_VERSION = 1;
 
-        private const string SETTINGS_SCHEMA_VERSION_PROPERTY = "SettingsSchemaVersion";
+        internal const string SETTINGS_SCHEMA_VERSION_PROPERTY = "SettingsSchemaVersion";
         private const string LEGACY_CROWD_FX_SETTING = "UseCrowdFx";
 
         private const string CROWD_CHEERING_SETTING = nameof(SettingsManager.SettingContainer.UseCrowdCheering);
