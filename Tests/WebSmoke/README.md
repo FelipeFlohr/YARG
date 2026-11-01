@@ -19,3 +19,19 @@ npx playwright test
 on an error screen (`#yarg-error`) or on any `console.error` that contains `Exception`.
 
 `fixtures/profile.json` is a minimal `YargProfile` record, used when the fresh build has no profile yet.
+
+## Fast builds while iterating
+
+`Editor.WebBuild.Build` takes `-webDev` for an incremental development build (no shader reimport or Addressables clean,
+development player, debug IL2CPP, `WasmCodeOptimization.BuildTimes`, wasm2023, no compression). Use one output folder
+and do not clean `Library/Bee` between builds; the player settings it changes are restored afterwards (check
+`git diff ProjectSettings`, and `git checkout ProjectSettings/ProjectSettings.asset` if Unity left explicit default
+IL2CPP values). The files have no `.br` extension, which `serve.mjs` handles.
+
+```bash
+"$UNITY_EDITOR" -batchmode -nographics -quit -projectPath "$PWD" -buildTarget WebGL \
+  -executeMethod Editor.WebBuild.Build -webDev -webBuildOutput ~/yarg-build-web-dev -logFile web-dev.log
+YARG_WEB_BUILD=~/yarg-build-web-dev npx playwright test
+```
+
+Never deploy a `-webDev` build; the normal build (no flag) is the release one.
