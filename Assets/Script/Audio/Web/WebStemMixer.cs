@@ -166,8 +166,11 @@ namespace YARG.Audio.Web
 
         protected override double GetVolume_Internal() => _volume;
 
+        // The synchronizer steers the control position (this position minus the output latency, see
+        // GetSyncPosition) to the song's target, so a seek lands that far ahead. Otherwise every start and resume
+        // would catch up by a rate change, which on the web also changes the pitch (an audible chirp).
         protected override void SetPosition_Internal(double position) =>
-            WebAudioNative.WebAudio_MixerSetPosition(_handle, position);
+            WebAudioNative.WebAudio_MixerSetPosition(_handle, position + _outputLatency * _songSpeed);
 
         protected override void SetVolume_Internal(double volume)
         {

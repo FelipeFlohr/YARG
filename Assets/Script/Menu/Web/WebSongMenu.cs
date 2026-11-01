@@ -34,20 +34,20 @@ namespace YARG.Menu.Web
             Result,
         }
 
-        private static readonly Color BackgroundColor = new(0.05f, 0.06f, 0.09f, 1f);
-        private static readonly Color PanelColor = new(0.11f, 0.13f, 0.18f, 1f);
-        private static readonly Color ButtonColor = new(0.18f, 0.22f, 0.32f, 1f);
-        private static readonly Color PrimaryButtonColor = new(0.16f, 0.55f, 0.32f, 1f);
-        private static readonly Color TextColor = new(0.95f, 0.96f, 0.98f, 1f);
-        private static readonly Color DimTextColor = new(0.65f, 0.69f, 0.78f, 1f);
-        private static readonly Color ErrorColor = new(1f, 0.42f, 0.42f, 1f);
+        private static readonly Color BackgroundColor = UiBuilder.BackgroundColor;
+        private static readonly Color PanelColor = UiBuilder.PanelColor;
+        private static readonly Color ButtonColor = UiBuilder.ButtonColor;
+        private static readonly Color PrimaryButtonColor = UiBuilder.PrimaryButtonColor;
+        private static readonly Color TextColor = UiBuilder.TextColor;
+        private static readonly Color DimTextColor = UiBuilder.DimTextColor;
+        private static readonly Color ErrorColor = UiBuilder.ErrorColor;
 
         private static WebSongMenu _instance;
 
         /// <summary>Whether the screen was opened from the practice menu.</summary>
         private static bool _practice;
 
-        private TMP_FontAsset _font;
+        private UiBuilder _ui;
 
         private TextMeshProUGUI _header;
         private GameObject _emptyPanel;
@@ -74,23 +74,13 @@ namespace YARG.Menu.Web
         /// </summary>
         public static MenuObject Create(Transform parent)
         {
-            var go = new GameObject("WebSongMenu", typeof(RectTransform));
-            go.SetActive(false);
-            go.transform.SetParent(parent, false);
-
-            var canvas = go.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            var scaler = go.AddComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = new Vector2(1920, 1080);
-            scaler.matchWidthOrHeight = 0.5f;
-            go.AddComponent<GraphicRaycaster>();
+            var go = UiBuilder.CreateCanvasObject("WebSongMenu", parent);
 
             var menuObject = go.AddComponent<MenuObject>();
             menuObject.SetUp(MenuManager.Menu.WebSong, true);
 
             var menu = go.AddComponent<WebSongMenu>();
-            menu._font = parent.GetComponentInChildren<TMP_Text>(true)?.font;
+            menu._ui = new UiBuilder(parent.GetComponentInChildren<TMP_Text>(true)?.font);
             menu.Build((RectTransform) go.transform);
             _instance = menu;
 
@@ -209,16 +199,19 @@ namespace YARG.Menu.Web
             var lines = new List<string>();
             foreach (var instrument in EnumExtensions<Instrument>.Values)
             {
-                if (!song.HasInstrument(instrument))
+                // The band "part" is only the song's overall intensity, not something to play
+                if (instrument == Instrument.Band || !song.HasInstrument(instrument))
                 {
                     continue;
                 }
 
+                // Vocals have no per-difficulty charts (the singer picks how strict the pitch is), so their
+                // difficulty flags say nothing useful
                 var part = song[instrument];
                 var difficulties = new List<string>();
                 foreach (var difficulty in EnumExtensions<Difficulty>.Values)
                 {
-                    if (part[difficulty])
+                    if (instrument.ToNativeGameMode() != GameMode.Vocals && part[difficulty])
                     {
                         difficulties.Add(difficulty.ToLocalizedName());
                     }
@@ -398,7 +391,7 @@ namespace YARG.Menu.Web
                 FontStyles.Bold, TextAlignmentOptions.Left, TextColor);
 
             // Empty state: what to do
-            _emptyPanel = CreateRect("Empty", root, new Vector2(0.15f, 0.3f), new Vector2(0.85f, 0.8f)).gameObject;
+            _emptyPanel = CreateRect("Empty", root, new Vector2(0.15f, 0.32f), new Vector2(0.85f, 0.82f)).gameObject;
             AddImage((RectTransform) _emptyPanel.transform, PanelColor);
             var prompt = CreateText("Prompt", _emptyPanel.transform, new Vector2(0.05f, 0.5f), new Vector2(0.95f, 0.85f),
                 64, FontStyles.Bold, TextAlignmentOptions.Center, TextColor);
@@ -408,7 +401,7 @@ namespace YARG.Menu.Web
             hint.text = Localize.Key("WebSong.Hint");
 
             // Song state: cover on the left, info on the right
-            _songPanel = CreateRect("Song", root, new Vector2(0.05f, 0.24f), new Vector2(0.95f, 0.84f)).gameObject;
+            _songPanel = CreateRect("Song", root, new Vector2(0.05f, 0.3f), new Vector2(0.95f, 0.85f)).gameObject;
             var songRect = (RectTransform) _songPanel.transform;
 
             var coverFrame = CreateRect("CoverFrame", songRect, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f));
@@ -434,11 +427,11 @@ namespace YARG.Menu.Web
             _parts.fontSizeMin = 18;
             _parts.fontSizeMax = 32;
 
-            _status = CreateText("Status", root, new Vector2(0.05f, 0.15f), new Vector2(0.95f, 0.22f), 34,
+            _status = CreateText("Status", root, new Vector2(0.05f, 0.215f), new Vector2(0.95f, 0.28f), 34,
                 FontStyles.Bold, TextAlignmentOptions.Center, DimTextColor);
 
-            // Buttons along the bottom
-            var buttons = CreateRect("Buttons", root, new Vector2(0.05f, 0.04f), new Vector2(0.95f, 0.13f));
+            // Buttons along the bottom, above the menus' hint bar
+            var buttons = CreateRect("Buttons", root, new Vector2(0.05f, 0.11f), new Vector2(0.95f, 0.2f));
             var layout = buttons.gameObject.AddComponent<HorizontalLayoutGroup>();
             layout.spacing = 32;
             layout.childAlignment = TextAnchor.MiddleCenter;
@@ -455,60 +448,18 @@ namespace YARG.Menu.Web
             backLabel.text = Localize.Key("Menu.Common.Back");
         }
 
-        private static RectTransform CreateRect(string name, Transform parent, Vector2 anchorMin, Vector2 anchorMax)
-        {
-            var go = new GameObject(name, typeof(RectTransform));
-            var rect = (RectTransform) go.transform;
-            rect.SetParent(parent, false);
-            rect.anchorMin = anchorMin;
-            rect.anchorMax = anchorMax;
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
-            return rect;
-        }
+        private static RectTransform CreateRect(string name, Transform parent, Vector2 anchorMin, Vector2 anchorMax) =>
+            UiBuilder.Rect(name, parent, anchorMin, anchorMax);
 
-        private static Image AddImage(RectTransform rect, Color color)
-        {
-            var image = rect.gameObject.AddComponent<Image>();
-            image.color = color;
-            image.raycastTarget = false;
-            return image;
-        }
+        private static Image AddImage(RectTransform rect, Color color) => UiBuilder.Image(rect, color);
 
         private TextMeshProUGUI CreateText(string name, Transform parent, Vector2 anchorMin, Vector2 anchorMax,
-            float size, FontStyles style, TextAlignmentOptions alignment, Color color)
-        {
-            var rect = CreateRect(name, parent, anchorMin, anchorMax);
-            var text = rect.gameObject.AddComponent<TextMeshProUGUI>();
-            if (_font != null)
-            {
-                text.font = _font;
-            }
-            text.fontSize = size;
-            text.fontStyle = style;
-            text.alignment = alignment;
-            text.color = color;
-            text.richText = true;
-            text.overflowMode = TextOverflowModes.Ellipsis;
-            text.raycastTarget = false;
-            return text;
-        }
+            float size, FontStyles style, TextAlignmentOptions alignment, Color color) =>
+            _ui.Text(name, parent, anchorMin, anchorMax, size, style, alignment, color);
 
         private Button CreateButton(string name, Transform parent, Color color, UnityAction onClick,
-            out TextMeshProUGUI label)
-        {
-            var rect = CreateRect(name, parent, Vector2.zero, Vector2.one);
-            var image = AddImage(rect, color);
-            image.raycastTarget = true;
-
-            var button = rect.gameObject.AddComponent<Button>();
-            button.targetGraphic = image;
-            button.onClick.AddListener(onClick);
-
-            label = CreateText("Label", rect, Vector2.zero, Vector2.one, 34, FontStyles.Bold,
-                TextAlignmentOptions.Center, TextColor);
-            return button;
-        }
+            out TextMeshProUGUI label) =>
+            _ui.Button(name, parent, color, onClick, out label);
 
         #endregion
     }

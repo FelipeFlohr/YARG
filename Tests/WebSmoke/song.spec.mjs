@@ -4,6 +4,7 @@ import { test, expect } from '@playwright/test';
 import path from 'node:path';
 import { buildSongFixtures, buildDir } from './fixtures/make-song.mjs';
 import { dismissAntiPiracyDialog } from './fixtures/dialogs.mjs';
+import { routeFixtures } from './fixtures/remote.mjs';
 
 const FIXTURES = '/__fixtures/song-build/';
 
@@ -13,6 +14,7 @@ test.setTimeout(300_000);
 test.beforeAll(() => {
   buildSongFixtures();
 });
+test.beforeEach(({ context }) => routeFixtures(context));
 
 // Every console line, with a way to wait for the n-th line that contains some text
 function collectLogs(page) {

@@ -1,7 +1,7 @@
 # Port web — estado em 2026-11-01
 
-Branch `claude/web-port`, com tudo commitado (`16b7c276`, `ddda08cd` e este registro). Spec:
-`docs/superpowers/specs/2026-10-31-web-port-design.md`. Nada foi enviado com push, e nenhum PR foi aberto.
+Mergeado nos forks (YARG#6, YARG.Core#2) e depois a rodada de testes e lobby em `claude/web-lobby` (abaixo). Spec:
+`docs/superpowers/specs/2026-10-31-web-port-design.md`.
 
 ## Feito
 
@@ -50,12 +50,32 @@ Branch `claude/web-port`, com tudo commitado (`16b7c276`, `ddda08cd` e este regi
 - O diálogo antipirataria não responde a Enter, porque nenhum botão do diálogo fica selecionado para o teclado. Os testes clicam no botão. É igual no desktop.
 - Com um perfil de teclado conectado, o Escape deixa de ser "voltar" no menu (Vermelho é `2`). É comportamento existente do desktop.
 
+## Rodada de 2026-11-01 (`claude/web-lobby`)
+
+- **Áudio**:
+  - O `AudioSynchronizer` corrigia o relógio mudando a taxa de reprodução, e na web isso muda o tom (vibrato audível). O `YargWebAudio.jspre` passou a suavizar o relógio e a ancorar o início das fontes.
+  - O início e cada retomada da música tocavam a até 1,5× por ~0,3 s (um "chirp"). O seek caía na posição alvo, mas o sincronizador mira a posição menos a latência de saída (~49 ms na web). Agora o `WebStemMixer` já faz o seek descontando a latência.
+  - Medido: taxa entre 0,96 e 1,03, fora de 1× em 0–1,2% dos frames. O `songs.spec.mjs` exige menos de 2%.
+- **Músicas reais** (`songs.spec.mjs` com as 3 `.sng` de Rush em `YARG_WEB_SONGS`): 158–160 FPS, deriva ≤ 5 ms, carregamento em 0,14–0,27 s. Soliloquy soa baixa (RMS 0,023), mas o trecho é calmo.
+- **Lobby online**: a cadeia de diálogos virou a tela `OnlineMenu`, feita em código, sem prefab.
+  - Salas: a lista de salas e o formulário de criar ou entrar ficam na mesma tela, com os erros no próprio formulário.
+  - Lobby: a música com capa e progresso do download, a banda com a parte e o status de cada um, as vagas abertas e o botão Iniciar.
+  - Design: artifact https://claude.ai/artifact/7EH4rsKd8RpUQZ8JkXZ6mj.
+  - Protocolo na versão 4 (`LobbyPlayer.HasPart`).
+  - O `lobby.spec.mjs` joga tudo pela UI: senha errada, depois a certa; diferença de 2,5–14 ms entre host e convidado; o host continua quando o convidado sai.
+- **Deploy** em `deploy/`: Docker Compose com o relay, o Caddy servindo o build local por bind mount e um sidecar Tailscale.
+  - Unity dentro do Docker ficou de fora (licença, `Library` de 8 GB, 31 min de build): o build é feito no PC e montado.
+  - Não testados contra hosts reais: o primeiro boot do sidecar e o `publish.sh`.
+- **HTTPS é necessário.** Microfone (vocais) e AudioWorklet só existem em contexto seguro, e o Unity recusa addressables por `http:` fora de localhost. Use `https://yarg.<tailnet>.ts.net` pelo sidecar (tabela no `deploy/README.md`).
+- **Suíte web**: 14 passaram e 1 foi pulado. **Regressão desktop**: offline PASS; host + cliente PASS, com `Band: score=608800 stars=5` nos dois lados.
+
 ## Falta
 
 1. Pendências menores registradas em `.superpowers/sdd/2026-10-31-web-port-1-boot/final-review.md` (14 Minors).
 2. Com o usuário:
-   - push e PRs (primeiro o Core em `FelipeFlohr/YARG.Core`, depois o YARG em `FelipeFlohr/YARG`, contra `master`), marcando as mudanças de UI como "não verificadas visualmente";
-   - deploy do relay na VPS e hospedagem do build web (os arquivos `.br` pedem `Content-Encoding: br`).
+   - deploy do relay na VPS e hospedagem do build web: pronto em `deploy/` (Docker Compose com relay, Caddy e um
+     sidecar Tailscale com HTTPS no tailnet; ver `deploy/README.md`); falta rodar na VPS.
+   - a UI do lobby no desktop não é exercitada pelo `-mp-autotest` (que pula os menus).
 
 ## Como retomar
 

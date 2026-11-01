@@ -1,15 +1,18 @@
 // Online match between two headless pages through a local relay (Server/YARG.Relay), driven by the in-game
 // autotest (MultiplayerAutoTest webhost/webjoin). Checks a wrong password is refused, that the client receives the
 // song the host loaded, and takes screenshots of both pages in gameplay and on the results screen.
+// With YARG_WEB_BASE_URL (a deployed build) no local relay is started: the pages use /ws on their own origin.
 import { test, expect } from '@playwright/test';
 import { spawn, spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { remoteBaseUrl, routeFixtures } from './fixtures/remote.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const relayProject = path.resolve(here, '..', '..', 'Server', 'YARG.Relay', 'YARG.Relay.csproj');
 const relayPort = Number(process.env.YARG_RELAY_PORT || 8090);
-const relayUrl = `ws://127.0.0.1:${relayPort}/ws`;
+// null: the game's default, /ws on the page's origin (ws: or wss: like the page)
+const relayUrl = remoteBaseUrl ? null : `ws://127.0.0.1:${relayPort}/ws`;
 
 const ROOM = 'SmokeRoom';
 const PASSWORD = 'certa123';
@@ -34,6 +37,7 @@ async function waitForHealth(timeoutMs) {
 }
 
 test.beforeAll(async () => {
+  if (remoteBaseUrl) return;
   test.setTimeout(240_000);
   relay = spawn('dotnet', ['run', '--project', relayProject, '--no-launch-profile', '--',
     '--urls', `http://127.0.0.1:${relayPort}`], { stdio: ['ignore', 'pipe', 'pipe'] });
@@ -52,7 +56,8 @@ test.afterAll(async () => {
   }
 });
 
-// The song fixture from the song-loading smoke test (subproject 3), served by serve.mjs under /__fixtures/.
+// The song fixture from the song-loading smoke test (subproject 3), served by serve.mjs under /__fixtures/
+// (or by routeFixtures against a deployed build).
 async function fixtureSongUrl() {
   if (process.env.YARG_WEB_SONG_URL) return process.env.YARG_WEB_SONG_URL;
   const fixtures = await import('./fixtures/make-song.mjs');
@@ -115,9 +120,10 @@ function query(params) {
 
 async function openPage(browser, baseURL, name, params) {
   const context = await browser.newContext({ baseURL, viewport: { width: 1280, height: 720 } });
+  await routeFixtures(context);
   const page = await context.newPage();
   const log = new Console(page, name);
-  await page.goto(query({ ...params, relay: relayUrl }));
+  await page.goto(query(relayUrl ? { ...params, relay: relayUrl } : params));
   await page.locator('#yarg-start').click();
   return { context, page, console: log };
 }

@@ -30,7 +30,7 @@ namespace YARG.Multiplayer.Tests.Protocol
             yield return new Reject(RejectCode.SessionFull, "v0.15");
             yield return new LobbyState(new[]
             {
-                new LobbyPlayer(0, "Host", Instrument.FiveFretGuitar, Difficulty.Expert, LobbyPlayerStatus.HasSong, 100),
+                new LobbyPlayer(0, "Host", Instrument.FiveFretGuitar, Difficulty.Expert, LobbyPlayerStatus.HasSong, 100, true),
                 new LobbyPlayer(2, "Bia", Instrument.ProDrums, Difficulty.Hard, LobbyPlayerStatus.Downloading, 42),
             }, TestOffer(), SessionState.Transferring);
             yield return new LobbyState(Array.Empty<LobbyPlayer>(), null, SessionState.Lobby);

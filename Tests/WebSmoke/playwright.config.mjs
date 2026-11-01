@@ -3,6 +3,12 @@ import os from 'node:os';
 import path from 'node:path';
 
 const port = Number(process.env.YARG_WEB_PORT || 8089);
+// Specs that measure real play (frame rates, long songs, several pages) run on the GPU project only
+const GPU_SPECS = ['gameplay.spec.mjs', 'songs.spec.mjs', 'lobby.spec.mjs'];
+// YARG_WEB_BASE_URL runs the specs against a deployed build (e.g. deploy/compose.yaml) instead of serve.mjs:
+// no local web server, no local relay (multiplayer.spec.mjs uses the page's own /ws), fixtures from
+// fixtures/remote.mjs
+const remoteBaseUrl = process.env.YARG_WEB_BASE_URL ? process.env.YARG_WEB_BASE_URL.replace(/\/+$/, '') : null;
 
 export default defineConfig({
   testDir: '.',
@@ -10,14 +16,14 @@ export default defineConfig({
   timeout: 180_000,
   workers: 1,
   reporter: 'list',
-  webServer: {
+  webServer: remoteBaseUrl ? undefined : {
     command: 'node serve.mjs',
     url: `http://127.0.0.1:${port}/`,
     reuseExistingServer: false,
     timeout: 30_000,
   },
   use: {
-    baseURL: `http://127.0.0.1:${port}`,
+    baseURL: remoteBaseUrl || `http://127.0.0.1:${port}`,
     headless: true,
     launchOptions: {
       // audio.spec.mjs writes the fake microphone WAV (a 440 Hz tone) before its tests run
@@ -27,11 +33,11 @@ export default defineConfig({
     },
   },
   projects: [
-    { name: 'chromium', use: { browserName: 'chromium' }, testIgnore: 'gameplay.spec.mjs' },
+    { name: 'chromium', use: { browserName: 'chromium' }, testIgnore: GPU_SPECS },
     {
       // Real GPU (ANGLE on D3D11) in the new headless mode, for frame rate measurements; still muted
       name: 'gpu',
-      testMatch: 'gameplay.spec.mjs',
+      testMatch: GPU_SPECS,
       use: {
         browserName: 'chromium',
         // Installed Edge (temporary profile, headless): the full Chromium download is blocked from running here

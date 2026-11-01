@@ -253,6 +253,7 @@ namespace YARG.Multiplayer.Protocol
             writer.Write((byte) player.Difficulty);
             writer.Write((byte) player.Status);
             writer.Write(player.Progress);
+            writer.Write(player.HasPart);
         }
 
         private static LobbyPlayer ReadLobbyPlayer(BinaryReader reader)
@@ -263,7 +264,8 @@ namespace YARG.Multiplayer.Protocol
                 ReadEnum<Instrument>(reader),
                 ReadEnum<Difficulty>(reader),
                 ReadEnum<LobbyPlayerStatus>(reader),
-                reader.ReadByte());
+                reader.ReadByte(),
+                reader.ReadBoolean());
         }
 
         private static void WriteSongOffer(BinaryWriter writer, SongOffer offer)

@@ -1,8 +1,8 @@
 using System.Linq;
 using Cysharp.Threading.Tasks;
-using UnityEngine;
 using YARG.Core;
 using YARG.Core.Extensions;
+using YARG.Core.Logging;
 using YARG.Helpers;
 using YARG.Helpers.Extensions;
 using YARG.Core.Song;
@@ -10,28 +10,32 @@ using YARG.Localization;
 using YARG.Menu;
 using YARG.Menu.Dialogs;
 using YARG.Menu.DifficultySelect;
-using YARG.Menu.MusicLibrary;
-using YARG.Menu.Navigation;
 using YARG.Menu.Persistent;
 using YARG.Multiplayer.Protocol;
-using YARG.Multiplayer.Session;
 using YARG.Player;
 
 namespace YARG.Multiplayer
 {
     /// <summary>
-    /// The online multiplayer dialogs: host or join, the lobby, and picking a part.
+    /// Online multiplayer's way through the menus: host or join, the lobby (<see cref="OnlineMenu"/>) and picking a
+    /// part.
     /// </summary>
     public static class MultiplayerMenuFlow
     {
-        private const float LOBBY_REFRESH_INTERVAL = 0.25f;
+        private static bool      _openLobbyRequested;
+        private static SongOffer _partPickedFor;
 
-        private static ListDialog _lobby;
-        private static bool       _lobbyDirty;
-        private static bool       _openLobbyRequested;
-        private static float      _lastLobbyRefresh = float.NegativeInfinity;
-
-        private static bool IsLobbyOpen => _lobby != null;
+        /// <summary>
+        /// The local player chose a part for the song offered now.
+        /// </summary>
+        public static bool HasPickedPart
+        {
+            get
+            {
+                var offer = MultiplayerManager.Instance.Session?.CurrentOffer;
+                return offer != null && ReferenceEquals(offer, _partPickedFor);
+            }
+        }
 
         public static void OpenEntry()
         {
@@ -56,7 +60,7 @@ namespace YARG.Multiplayer
             // The web joins password rooms on the relay instead of an address
             if (PlatformInfo.IsWeb)
             {
-                MultiplayerWebMenu.OpenRoomBrowser();
+                OnlineMenu.ShowRooms();
                 return;
             }
 
@@ -77,7 +81,6 @@ namespace YARG.Multiplayer
                     // Runs before the rename dialog is cleared, so the lobby opens on the next frame
                     if (MultiplayerManager.Instance.Join(address))
                     {
-                        _lobbyDirty = true;
                         _openLobbyRequested = true;
                     }
                 });
@@ -86,14 +89,13 @@ namespace YARG.Multiplayer
 
         public static void OpenLobby()
         {
-            if (!MultiplayerManager.IsActive || IsLobbyOpen || DialogManager.Instance.IsDialogShowing ||
+            if (!MultiplayerManager.IsActive || MenuManager.Instance == null ||
                 GlobalVariables.Instance.CurrentScene != SceneIndex.Menu || MultiplayerGameplay.IsInMatch)
             {
                 return;
             }
 
-            _lobby =DialogManager.Instance.ShowList(Localize.Key("Menu.Multiplayer.Lobby"));
-            RebuildLobby();
+            OnlineMenu.ShowLobby();
         }
 
         /// <summary>
@@ -107,6 +109,7 @@ namespace YARG.Multiplayer
             {
                 manager.Session?.SetLocalPart(localPlayer.Profile.CurrentInstrument,
                     localPlayer.Profile.CurrentDifficulty);
+                _partPickedFor = manager.Session?.CurrentOffer;
             }
 
             OpenLobby();
@@ -121,7 +124,6 @@ namespace YARG.Multiplayer
                 return;
             }
 
-            CloseLobby();
             if (DialogManager.Instance.IsDialogShowing)
             {
                 return;
@@ -129,9 +131,11 @@ namespace YARG.Multiplayer
 
             var profile = player.Profile;
             var dialog = DialogManager.Instance.ShowList(Localize.Key("Menu.Multiplayer.ChoosePart"));
+            YargLogger.LogInfo("[Online] Part picker");
             // A profile in a game mode without a track (left over from an older version) has no part to play
+            // The profile's own instrument first, hardest difficulty first: what most players pick
             var instruments = profile.GameMode.HasGameplayTrack()
-                ? profile.GameMode.PossibleInstrumentsForSong(song)
+                ? profile.GameMode.PossibleInstrumentsForSong(song).OrderBy(i => i != profile.CurrentInstrument)
                 : Enumerable.Empty<Instrument>();
             foreach (var instrument in instruments)
             {
@@ -141,7 +145,7 @@ namespace YARG.Multiplayer
                     continue;
                 }
 
-                foreach (var difficulty in EnumExtensions<Difficulty>.Values)
+                foreach (var difficulty in EnumExtensions<Difficulty>.Values.Reverse())
                 {
                     if (!PartDifficulty.HasPlayableDifficulty(song, instrument, difficulty))
                     {
@@ -153,6 +157,8 @@ namespace YARG.Multiplayer
                         profile.CurrentInstrument = instrument;
                         profile.CurrentDifficulty = difficulty;
                         session.SetLocalPart(instrument, difficulty);
+                        _partPickedFor = session.CurrentOffer;
+                        YargLogger.LogFormatInfo("[Online] Part: {0} {1}", instrument, difficulty);
 
                         DialogManager.Instance.ClearDialog();
                         OpenLobby();
@@ -172,27 +178,16 @@ namespace YARG.Multiplayer
                 OpenLobby();
             }
 
-            if (!IsLobbyOpen)
+            // The session ended (the host left, the connection dropped) while the lobby was up
+            if (!MultiplayerManager.IsActive && OnlineMenu.IsLobbyShowing)
             {
-                _lobby = null;
-                return;
-            }
-
-            if (!MultiplayerManager.IsActive)
-            {
-                CloseLobby();
-                return;
-            }
-
-            if (_lobbyDirty && Time.unscaledTime - _lastLobbyRefresh >= LOBBY_REFRESH_INTERVAL)
-            {
-                RebuildLobby();
+                OnlineMenu.Close();
             }
         }
 
         public static void OnLobbyChanged()
         {
-            _lobbyDirty = true;
+            OnlineMenu.MarkDirty();
         }
 
         /// <summary>
@@ -203,105 +198,17 @@ namespace YARG.Multiplayer
             _openLobbyRequested = true;
         }
 
-        private static void RebuildLobby()
-        {
-            _lobbyDirty = false;
-            _lastLobbyRefresh = Time.unscaledTime;
-            _lobby.ClearList();
-
-            var manager = MultiplayerManager.Instance;
-            var session = manager.Session;
-            var offer = session.CurrentOffer;
-
-            _lobby.Title.text = offer == null
-                ? Localize.Key("Menu.Multiplayer.Lobby")
-                : $"{Localize.Key("Menu.Multiplayer.Lobby")}\n<size=65%>{offer.Name} - {offer.Artist}</size>";
-
-            foreach (var player in session.Players)
-            {
-                _lobby.AddListButton(FormatPlayer(player), () => { }, false);
-            }
-
-            if (session is HostSession host)
-            {
-                if (PlatformInfo.IsWeb)
-                {
-                    // No library on the web: the host uploads the song
-                    _lobby.AddListButton(Localize.Key("Menu.Multiplayer.Web.PickSong"), () =>
-                    {
-                        CloseLobby();
-                        MultiplayerWebMenu.PickAndOfferSong().Forget();
-                    }, false);
-                }
-                else
-                {
-                    _lobby.AddListButton(Localize.Key("Menu.Multiplayer.ChooseSong"), () =>
-                    {
-                        CloseLobby();
-                        var menu = MenuManager.Instance.PushMenu(MenuManager.Menu.MusicLibrary, false);
-                        MusicLibraryMenu.LibraryMode = MusicLibraryMode.QuickPlay;
-                        menu.gameObject.SetActive(true);
-                    }, false);
-                }
-
-                _lobby.AddListButton(Localize.Key("Menu.Multiplayer.Start"), () =>
-                {
-                    if (!host.CanBeginLoad)
-                    {
-                        ToastManager.ToastWarning(Localize.Key("Menu.Multiplayer.NotReady"));
-                        return;
-                    }
-
-                    CloseLobby();
-                    host.BeginLoad();
-                }, false);
-            }
-
-            var song = offer == null ? null : MultiplayerSongLibrary.FindByHash(offer.Hash);
-            if (song != null)
-            {
-                _lobby.AddListButton(Localize.Key("Menu.Multiplayer.ChoosePart"), () => OpenPartPicker(song), false);
-            }
-
-            _lobby.AddListButton(Localize.Key("Menu.Multiplayer.Leave"), () =>
-            {
-                CloseLobby();
-                manager.Leave();
-            }, false);
-        }
-
-        private static string FormatPlayer(LobbyPlayer player)
-        {
-            string status = Localize.Key($"Menu.Multiplayer.Status.{player.Status}");
-            if (player.Status == LobbyPlayerStatus.Downloading)
-            {
-                status += $" {player.Progress}%";
-            }
-
-            return $"{player.Name} - {player.Instrument.ToLocalizedName()} {player.Difficulty.ToLocalizedName()} - {status}";
-        }
-
         /// <summary>
-        /// Closes any dialog this flow opened (lobby, part picker, join prompt) before leaving the menu.
+        /// Closes any dialog this flow opened (part picker, join prompt) before leaving the menu.
         /// The dialog manager is persistent, so they would otherwise stay over gameplay.
         /// </summary>
         public static void CloseAll()
         {
             _openLobbyRequested = false;
-            _lobby = null;
             if (DialogManager.Instance.IsDialogShowing)
             {
                 DialogManager.Instance.ClearDialog();
             }
-        }
-
-        private static void CloseLobby()
-        {
-            if (IsLobbyOpen)
-            {
-                DialogManager.Instance.ClearDialog();
-            }
-            _lobby = null;
         }
 
         private static void ShowError(string key)

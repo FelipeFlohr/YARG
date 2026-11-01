@@ -10,6 +10,9 @@ const port = Number(process.env.YARG_WEB_PORT || 8089);
 const root = path.resolve(process.env.YARG_WEB_BUILD || path.join(os.homedir(), 'yarg-build-web'));
 const FIXTURES_PREFIX = '/__fixtures/';
 const fixturesRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures');
+// Real songs for songs.spec.mjs (YARG_WEB_SONGS, e.g. a folder of .sng files), served under /__songs/
+const SONGS_PREFIX = '/__songs/';
+const songsRoot = process.env.YARG_WEB_SONGS ? path.resolve(process.env.YARG_WEB_SONGS) : null;
 
 const types = {
   '.html': 'text/html; charset=utf-8',
@@ -41,6 +44,9 @@ const server = http.createServer((req, res) => {
   if (pathname.startsWith(FIXTURES_PREFIX)) {
     base = fixturesRoot;
     pathname = pathname.slice(FIXTURES_PREFIX.length - 1);
+  } else if (songsRoot && pathname.startsWith(SONGS_PREFIX)) {
+    base = songsRoot;
+    pathname = pathname.slice(SONGS_PREFIX.length - 1);
   }
 
   const file = path.join(base, pathname);

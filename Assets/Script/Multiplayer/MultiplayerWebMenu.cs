@@ -100,10 +100,15 @@ namespace YARG.Multiplayer
             }
         }
 
-        public static void OpenRoomBrowser()
-        {
-            OpenRoomBrowserAsync().Forget();
-        }
+        /// <summary>
+        /// The room this machine created or joined last, for the lobby's title.
+        /// </summary>
+        public static string RoomName { get; private set; }
+
+        /// <summary>
+        /// The size of that room, or 0 when unknown.
+        /// </summary>
+        public static int RoomMaxPlayers { get; private set; }
 
         private static WebSocketTransport EnsureTransport()
         {
@@ -116,92 +121,46 @@ namespace YARG.Multiplayer
             return _transport;
         }
 
-        private static void DropTransport()
+        /// <summary>
+        /// Closes the socket opened for the room list, e.g. when the player leaves the online screen.
+        /// </summary>
+        public static void DropTransport()
         {
             _transport?.Dispose();
             _transport = null;
         }
 
-        private static void ShowError(RelayException error)
+        private static string Fail(WebSocketTransport transport, RelayException error)
         {
             YargLogger.LogFormatWarning("Relay request failed: {0}", error.Message);
-            ToastManager.ToastError(DescribeError(error));
-            if (error.Code == RelayException.CONNECTION_LOST)
+            // Only this request's socket: the screen may have dropped it and opened another meanwhile
+            if (error.Code == RelayException.CONNECTION_LOST && transport == _transport)
             {
                 DropTransport();
+            }
+            return DescribeError(error);
+        }
+
+        /// <summary>
+        /// The relay's rooms, or <c>null</c> and the error to show.
+        /// </summary>
+        public static async UniTask<(IReadOnlyList<RelayRoom> Rooms, string Error)> ListRoomsAsync()
+        {
+            var transport = EnsureTransport();
+            try
+            {
+                return (await WaitForRelay(transport, transport.ListRoomsAsync()), null);
+            }
+            catch (RelayException e)
+            {
+                return (null, Fail(transport, e));
             }
         }
 
         /// <summary>
-        /// A dialog's callback runs before that dialog is cleared, so the next one waits for it.
+        /// Joins <paramref name="room"/> and starts the client session. Returns the error to show, or <c>null</c>.
         /// </summary>
-        private static UniTask WaitForNoDialog() =>
-            UniTask.WaitUntil(() => !DialogManager.Instance.IsDialogShowing);
-
-        private static async UniTaskVoid OpenRoomBrowserAsync()
-        {
-            var transport = EnsureTransport();
-
-            IReadOnlyList<RelayRoom> rooms;
-            try
-            {
-                rooms = await WaitForRelay(transport, transport.ListRoomsAsync());
-            }
-            catch (RelayException e)
-            {
-                ShowError(e);
-                return;
-            }
-
-            await WaitForNoDialog();
-            var dialog = DialogManager.Instance.ShowList(Localize.Key("Menu.Multiplayer.Web.Rooms"));
-            if (rooms.Count == 0)
-            {
-                dialog.AddListButton(Localize.Key("Menu.Multiplayer.Web.NoRooms"), () => { }, false);
-            }
-
-            foreach (var room in rooms)
-            {
-                string label = Localize.KeyFormat("Menu.Multiplayer.Web.Room", room.Name, room.Players,
-                    room.MaxPlayers);
-                if (room.Playing)
-                {
-                    label += Localize.Key("Menu.Multiplayer.Web.InMatch");
-                }
-
-                dialog.AddListButton(label, () =>
-                {
-                    DialogManager.Instance.ClearDialog();
-                    AskPassword(room);
-                }, false);
-            }
-
-            dialog.AddListButton(Localize.Key("Menu.Multiplayer.Web.CreateRoom"), () =>
-            {
-                DialogManager.Instance.ClearDialog();
-                AskRoomName();
-            }, false);
-            dialog.AddListButton(Localize.Key("Menu.Multiplayer.Web.Refresh"), () =>
-            {
-                DialogManager.Instance.ClearDialog();
-                OpenRoomBrowser();
-            }, false);
-            dialog.AddListButton(Localize.Key("Menu.Common.Back"), () =>
-            {
-                DialogManager.Instance.ClearDialog();
-                DropTransport();
-            }, false);
-        }
-
-        private static void AskPassword(RelayRoom room)
-        {
-            var dialog = DialogManager.Instance.ShowRenameDialog(
-                Localize.KeyFormat("Menu.Multiplayer.Web.JoinPassword", room.Name),
-                password => JoinAsync(room, password).Forget());
-            dialog.SetPasswordMode();
-        }
-
-        private static async UniTaskVoid JoinAsync(RelayRoom room, string password)
+        public static async UniTask<string> JoinAsync(RelayRoom room, string password)
         {
             var transport = EnsureTransport();
             try
@@ -210,49 +169,21 @@ namespace YARG.Multiplayer
             }
             catch (RelayException e)
             {
-                ShowError(e);
-                // Back to the list, e.g. to try the password again
-                await WaitForNoDialog();
-                OpenRoomBrowser();
-                return;
+                return Fail(transport, e);
             }
 
             // The session owns the transport now
             _transport = null;
+            RoomName = room.Name;
+            RoomMaxPlayers = room.MaxPlayers;
             MultiplayerManager.Instance.JoinWeb(transport);
-            MultiplayerMenuFlow.RequestOpenLobby();
+            return null;
         }
 
-        private static void AskRoomName()
-        {
-            DialogManager.Instance.ShowRenameDialog(Localize.Key("Menu.Multiplayer.Web.RoomName"),
-                name => AskRoomPassword(name.Trim()).Forget());
-        }
-
-        private static async UniTaskVoid AskRoomPassword(string name)
-        {
-            await WaitForNoDialog();
-            var dialog = DialogManager.Instance.ShowRenameDialog(Localize.Key("Menu.Multiplayer.Web.RoomPassword"),
-                password => AskMaxPlayers(name, password).Forget());
-            dialog.SetPasswordMode();
-        }
-
-        private static async UniTaskVoid AskMaxPlayers(string name, string password)
-        {
-            await WaitForNoDialog();
-            var dialog = DialogManager.Instance.ShowList(Localize.Key("Menu.Multiplayer.Web.MaxPlayers"));
-            for (int players = 2; players <= ProtocolInfo.MaxMachines; players++)
-            {
-                int max = players;
-                dialog.AddListButton(Localize.KeyFormat("Menu.Multiplayer.Web.Players", max), () =>
-                {
-                    DialogManager.Instance.ClearDialog();
-                    CreateAsync(name, password, max).Forget();
-                }, false);
-            }
-        }
-
-        private static async UniTaskVoid CreateAsync(string name, string password, int maxPlayers)
+        /// <summary>
+        /// Creates a room and starts the host session. Returns the error to show, or <c>null</c>.
+        /// </summary>
+        public static async UniTask<string> CreateAsync(string name, string password, int maxPlayers)
         {
             var transport = EnsureTransport();
             try
@@ -261,13 +192,14 @@ namespace YARG.Multiplayer
             }
             catch (RelayException e)
             {
-                ShowError(e);
-                return;
+                return Fail(transport, e);
             }
 
             _transport = null;
+            RoomName = name;
+            RoomMaxPlayers = maxPlayers;
             MultiplayerManager.Instance.HostWeb(transport);
-            MultiplayerMenuFlow.RequestOpenLobby();
+            return null;
         }
 
         /// <summary>

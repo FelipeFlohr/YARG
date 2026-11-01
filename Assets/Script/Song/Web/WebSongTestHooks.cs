@@ -53,15 +53,15 @@ namespace YARG.Song.Web
                 return;
             }
 
-            int split = message.IndexOf('|');
-            string command = split < 0 ? message : message.Substring(0, split);
+            var parts = message.Split('|');
+            string command = parts[0];
 
             try
             {
                 switch (command)
                 {
                     case "bot":
-                        EnsureBotPlayer();
+                        EnsureBotPlayer(parts.Length > 1 ? parts[1] : null, parts.Length > 2 ? parts[2] : null);
                         break;
                     case "play":
                         Play();
@@ -80,8 +80,12 @@ namespace YARG.Song.Web
             YargLogger.LogFormatInfo(LOG_PREFIX + "Done: {0}", command);
         }
 
-        /// <summary>Makes sure exactly one active bot player exists, playing five-fret guitar.</summary>
-        private static void EnsureBotPlayer()
+        /// <summary>
+        /// Makes sure exactly one active bot player exists, playing five-fret guitar unless
+        /// <paramref name="instrument"/> (an <see cref="Instrument"/> name) says otherwise. <c>bot|Name|Instrument</c>
+        /// names a new profile, e.g. to tell the players of an online test apart.
+        /// </summary>
+        private static void EnsureBotPlayer(string name, string instrument)
         {
             var active = PlayerContainer.Players.FirstOrDefault(p => !p.SittingOut);
             if (active == null)
@@ -89,12 +93,14 @@ namespace YARG.Song.Web
                 var profile = PlayerContainer.Profiles.FirstOrDefault(p => !PlayerContainer.IsProfileTaken(p));
                 if (profile == null)
                 {
-                    var guitar = Instrument.FiveFretGuitar;
+                    var part = string.IsNullOrEmpty(instrument)
+                        ? Instrument.FiveFretGuitar
+                        : (Instrument) Enum.Parse(typeof(Instrument), instrument);
                     profile = new YargProfile
                     {
-                        Name = "Web Test",
-                        GameMode = guitar.ToNativeGameMode(),
-                        CurrentInstrument = guitar,
+                        Name = string.IsNullOrEmpty(name) ? "Web Test" : name,
+                        GameMode = part.ToNativeGameMode(),
+                        CurrentInstrument = part,
                     };
                     PlayerContainer.AddProfile(profile);
                 }

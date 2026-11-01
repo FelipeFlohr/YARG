@@ -1,0 +1,72 @@
+# YARG web: the WebGL build and the multiplayer relay on one origin. See README.md in this folder.
+#
+#   relay      Server/YARG.Relay, built from source; only reachable inside the stack.
+#   web        Caddy: the build (bind-mounted, read-only) and /ws proxied to the relay, plain HTTP on port 80.
+#              Also published on ${YARG_HTTP_BIND}:${YARG_HTTP_PORT} of the host (default 127.0.0.1:8080).
+#   tailscale  (profile "tailnet") joins the tailnet as ${TS_HOSTNAME} and serves
+#              https://${TS_HOSTNAME}.<tailnet>.ts.net -> http://web:80 with a Tailscale certificate.
+#
+# Without COMPOSE_PROFILES=tailnet (see .env.example) only relay + web run: plain HTTP for local testing.
+name: yarg
+
+services:
+  relay:
+    build: ../Server/YARG.Relay
+    restart: unless-stopped
+    environment:
+      # Caddy always rewrites X-Forwarded-For (it keeps the incoming value only from the tailscale sidecar, whose
+      # serve proxy overwrites it with the player's tailnet IP), so the first entry is the player
+      Relay__TrustForwardedFor: "true"
+    expose:
+      - "8080"
+    networks:
+      - yarg
+
+  web:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - relay
+    ports:
+      - "${YARG_HTTP_BIND:-127.0.0.1}:${YARG_HTTP_PORT:-8080}:80"
+    environment:
+      YARG_TRUSTED_PROXIES: ${YARG_TRUSTED_PROXIES:-172.31.250.10/32}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${YARG_WEB_BUILD:-./web}:/srv/yarg:ro
+    networks:
+      - yarg
+
+  tailscale:
+    image: tailscale/tailscale:${TS_IMAGE_TAG:-stable}
+    profiles: ["tailnet"]
+    hostname: ${TS_HOSTNAME:-yarg}
+    restart: unless-stopped
+    depends_on:
+      - web
+    environment:
+      # Needed only the first time; the node key is then kept in the ts_state volume
+      TS_AUTHKEY: ${TS_AUTHKEY:-}
+      TS_AUTH_ONCE: "true"
+      TS_HOSTNAME: ${TS_HOSTNAME:-yarg}
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_SERVE_CONFIG: /config/serve.json
+      # Userspace networking: no /dev/net/tun or NET_ADMIN; `serve` still terminates TLS and proxies to web:80
+      TS_USERSPACE: "true"
+      TS_EXTRA_ARGS: ${TS_EXTRA_ARGS:-}
+    volumes:
+      - ./tailscale-serve.json:/config/serve.json:ro
+      - ts_state:/var/lib/tailscale
+    networks:
+      yarg:
+        # Fixed, so Caddy trusts X-Forwarded-For from this address only (YARG_TRUSTED_PROXIES)
+        ipv4_address: 172.31.250.10
+
+networks:
+  yarg:
+    ipam:
+      config:
+        - subnet: 172.31.250.0/24
+
+volumes:
+  ts_state:
