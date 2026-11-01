@@ -106,7 +106,7 @@ namespace YARG
 
             SettingsManager.LoadStartupSettings();
 #if UNITY_WEBGL && !UNITY_EDITOR
-            GlobalAudioHandler.Initialize<SilentAudioManager>();
+            GlobalAudioHandler.Initialize<WebAudioManager>();
 #else
             GlobalAudioHandler.Initialize<BassAudioManager>();
 #endif

@@ -99,10 +99,8 @@ namespace YARG.Audio.BASS
         /// decoded at construction time. Avoids the BASS stream creation + sample decode that
         /// makes full re-creation (<see cref="BassSong.CreateOneShotChannel"/>) too slow to call
         /// on every offset change during live calibration.
-        /// Unity-side only: not part of the <see cref="OneShotChannel"/> base class, so callers
-        /// need a reference typed as <see cref="BassOneShotChannel"/> to use it.
         /// </summary>
-        public void UpdateSchedule(IReadOnlyList<double> scheduledPlays)
+        public override void UpdateSchedule(IReadOnlyList<double> scheduledPlays)
         {
             if (_disposed || _sample == null)
             {

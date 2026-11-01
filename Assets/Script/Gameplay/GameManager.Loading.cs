@@ -177,6 +177,7 @@ namespace YARG.Gameplay
             context.Queue(UniTask.RunOnThreadPool(LoadChart), "Loading chart...");
             context.Queue(UniTask.RunOnThreadPool(LoadAudio), "Loading audio...");
             await context.Wait();
+            await WaitForDeferredAudio(context);
 
             if (_loadState == LoadFailureState.Rescan)
             {
