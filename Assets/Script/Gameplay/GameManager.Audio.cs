@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Cysharp.Threading.Tasks;
 using DG.Tweening;
 using DG.Tweening.Core;
 using DG.Tweening.Plugins.Options;
 using UnityEngine;
+using YARG.Audio;
 using YARG.Core.Audio;
 using YARG.Multiplayer;
 using YARG.Multiplayer.Audio;
@@ -90,7 +92,16 @@ namespace YARG.Gameplay
 
             _stemStates.Clear();
             _stemMutes = new StemMuteTracker();
-            _mixer = Song.LoadAudio(GlobalVariables.State.SongSpeed, DEFAULT_VOLUME, censorAudio);
+            StemUsageHint.PlayedStems = GetPlayedStems();
+            try
+            {
+                _mixer = Song.LoadAudio(GlobalVariables.State.SongSpeed, DEFAULT_VOLUME, censorAudio);
+            }
+            finally
+            {
+                StemUsageHint.PlayedStems = null;
+            }
+
             if (_mixer == null)
             {
                 _loadState = LoadFailureState.Error;
@@ -105,6 +116,62 @@ namespace YARG.Gameplay
             }
 
             _backgroundStem = _stemStates.Count > 1 ? SongStem.Song : _stemStates.First().Key;
+        }
+
+        /// <summary>
+        /// Stems that can be muted in this song, for <see cref="StemUsageHint"/>. Online, the remote players'
+        /// instruments are only known after the audio loads, so every stem counts.
+        /// </summary>
+        private HashSet<SongStem> GetPlayedStems()
+        {
+            var stems = new HashSet<SongStem>();
+            if (MultiplayerGameplay.IsInMatch)
+            {
+                foreach (SongStem stem in Enum.GetValues(typeof(SongStem)))
+                {
+                    stems.Add(stem);
+                }
+
+                return stems;
+            }
+
+            foreach (var player in YargPlayers)
+            {
+                try
+                {
+                    stems.UnionWith(player.Profile.CurrentInstrument.ToSongStems());
+                }
+                catch (Exception)
+                {
+                    // An instrument without stems of its own
+                }
+            }
+
+            return stems;
+        }
+
+        /// <summary>
+        /// Waits for a backend that decodes stems after they are added (the web build), then fails the load the
+        /// usual way if the song cannot play.
+        /// </summary>
+        private async UniTask WaitForDeferredAudio(LoadingContext context)
+        {
+            if (_mixer is not IDeferredStemMixer deferred || _loadState != LoadFailureState.None)
+            {
+                return;
+            }
+
+            if (deferred.IsLoading)
+            {
+                context.SetLoadingText("Decoding audio...");
+                await UniTask.WaitUntil(() => !deferred.IsLoading);
+            }
+
+            if (deferred.LoadError != null)
+            {
+                _loadState = LoadFailureState.Error;
+                _loadFailureMessage = deferred.LoadError;
+            }
         }
 
         public void ChangeStarPowerStatus(bool active)

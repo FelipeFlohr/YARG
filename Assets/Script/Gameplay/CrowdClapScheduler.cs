@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using YARG.Audio.BASS;
 using YARG.Core.Audio;
 using YARG.Core.Chart;
 using YARG.Core.Parsing;
@@ -22,10 +21,7 @@ namespace YARG.Gameplay
         private double[] _chartTimes = Array.Empty<double>();
         private double[] _playTimes = Array.Empty<double>();
 
-        // Held as the concrete Bass type (rather than the OneShotChannel base from YARG.Core)
-        // so Reschedule() can call UpdateSchedule() without a YARG.Core change. Bass is
-        // currently the only audio backend, so this cast is safe.
-        private BassOneShotChannel _channel;
+        private OneShotChannel _channel;
         private bool _enabled;
         private bool _scheduled;
         private bool _disposed;
@@ -59,7 +55,7 @@ namespace YARG.Gameplay
             }
 
             var outputChannel = GlobalAudioHandler.CreateOutputChannel(channelId);
-            _channel = (BassOneShotChannel) _mixer.CreateOneShotChannel(stream, _playTimes, OUTPUT_LEAD_TIME, outputChannel);
+            _channel = _mixer.CreateOneShotChannel(stream, _playTimes, OUTPUT_LEAD_TIME, outputChannel);
             _channel.SetEnabled(_enabled);
             SettingsManager.Settings.SfxVolume.OnChange += OnVolumeChanged;
             ApplyVolume();
