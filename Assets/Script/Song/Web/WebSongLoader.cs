@@ -182,7 +182,7 @@ namespace YARG.Song.Web
                 var result = SingleSongLoader.Load(songPath);
                 if (!result.Success)
                 {
-                    YargLogger.LogFormatWarning("Could not load the song at {0}: {1} {2}", songPath, result.Error, result.Reason);
+                    YargLogger.LogFormatWarning<string, string, string>("Could not load the song at {0}: {1} {2}", songPath, result.Error.ToString(), result.Reason);
                     throw new WebSongLoadException(ToWebError(result.Error), result.Reason);
                 }
 
@@ -193,7 +193,7 @@ namespace YARG.Song.Web
 
                 Current = result.Entry;
                 _currentRoot = root;
-                YargLogger.LogFormatInfo("[WebSong] Loaded \"{0}\" by \"{1}\" from {2}", Current.Name.Original, Current.Artist.Original, songPath);
+                YargLogger.LogFormatInfo<string, string, string>("[WebSong] Loaded \"{0}\" by \"{1}\" from {2}", Current.Name.Original, Current.Artist.Original, songPath);
                 return Current;
             }
             catch (Exception e)

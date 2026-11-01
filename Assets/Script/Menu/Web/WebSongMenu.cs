@@ -12,6 +12,7 @@ using YARG.Core.Logging;
 using YARG.Core.Song;
 using YARG.Helpers.Extensions;
 using YARG.Localization;
+using YARG.Menu.MusicLibrary;
 using YARG.Menu.Navigation;
 using YARG.Menu.Persistent;
 using YARG.Player;
@@ -143,10 +144,11 @@ namespace YARG.Menu.Web
 
             _header.text = Localize.Key("Menu.Main.Options", _practice ? "Practice" : "Quickplay");
 
-            // Coming back from the score screen of this same song
+            // Coming back from the score screen of this same song. The score screen resets GlobalVariables.State
+            // when it closes, but leaves the song it showed in MusicLibraryMenu.CurrentlyPlaying.
             var song = WebSongLoader.Current;
-            bool afterResult = song != null && GlobalVariables.State.ScoreScreenStats.HasValue &&
-                ReferenceEquals(GlobalVariables.State.CurrentSong, song);
+            bool afterResult = song != null && ReferenceEquals(MusicLibraryMenu.CurrentlyPlaying, song);
+            MusicLibraryMenu.CurrentlyPlaying = null;
             SetStatus(null, false);
             Show(song, afterResult ? Mode.Result : null);
         }
