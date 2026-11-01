@@ -543,6 +543,40 @@
         return ctx ? ctx.currentTime : 0;
     }
 
+    // ctx.currentTime only moves once per rendered block (several ms, depending on the browser and the device), while
+    // the game reads the song position from a smooth clock every frame. Read raw, the steps look like sync errors and
+    // the synchronizer keeps nudging the playback rate, which on the web shifts the pitch (an audible warble).
+    // This estimates the context time between steps from performance.now(), with the offset between the two clocks
+    // averaged over the steps; it never runs backwards and stays within SMOOTH_MAX_LEAD of the raw time, so it stops
+    // when the context is suspended.
+    var SMOOTH_MAX_LEAD = 0.05;
+    var SMOOTH_GAIN = 0.02;
+    var smoothOffset = null;
+    var smoothLastRaw = -1;
+    var smoothLast = 0;
+
+    function smoothNow() {
+        if (!ctx) {
+            return 0;
+        }
+        var raw = ctx.currentTime;
+        var wall = performance.now() / 1000;
+        var offset = raw - wall;
+        if (smoothOffset === null || raw < smoothLastRaw || Math.abs(offset - smoothOffset) > SMOOTH_MAX_LEAD) {
+            // First read, or the clocks jumped apart (suspend, resume): start over from the raw time
+            smoothOffset = offset;
+            smoothLast = raw;
+        } else if (raw !== smoothLastRaw) {
+            smoothOffset += (offset - smoothOffset) * SMOOTH_GAIN;
+        }
+        smoothLastRaw = raw;
+        // Not clamped to the raw time from below: the averaged offset trails it a little (it is read some time after
+        // each step), and pulling the estimate up to every step would bring the jumps back
+        var estimate = Math.min(wall + smoothOffset, raw + SMOOTH_MAX_LEAD);
+        smoothLast = Math.max(estimate, smoothLast);
+        return smoothLast;
+    }
+
     // ---------------------------------------------------------------------------------------------------------
     // Mixers and stems
     // ---------------------------------------------------------------------------------------------------------
@@ -736,13 +770,18 @@
 
     function startSources(mixer) {
         var clock = mixer.clock;
-        var when = now() + START_LEAD;
-        clock.start(when);
+        if (!clock.playing) {
+            // The position runs from the request on, as the game expects; the sources can only be scheduled a little
+            // ahead (START_LEAD), so they start that much into the audio instead of making the position wait for them
+            clock.start(smoothNow());
+        }
         mixer.ended = false;
         mixer.endReported = false;
         lastPlayedMixer = mixer.id;
 
-        var position = clock.offset;
+        var when = now() + START_LEAD;
+        var zeroAt = clock.contextTimeOf(0);
+        var position = clock.position(when);
         mixer.stems.forEach(function (stem) {
             stopStemSource(stem);
             if (!stem.buffer || position >= stem.buffer.duration) {
@@ -752,10 +791,10 @@
             source.buffer = stem.buffer;
             source.playbackRate.value = clock.rate;
             source.connect(stem.gain);
-            if (position >= 0) {
-                source.start(when, position);
+            if (zeroAt >= when) {
+                source.start(zeroAt, 0);
             } else {
-                source.start(when - position / clock.rate, 0);
+                source.start(when, Math.max(0, position));
             }
             stem.source = source;
         });
@@ -774,7 +813,10 @@
             return 0;
         }
         if (mixer.loading > 0) {
+            // The position starts running now anyway, so the game and the audio stay together; the sources join in
+            // (that far into the audio) once the stems are decoded
             mixer.playRequested = true;
+            mixer.clock.start(smoothNow());
             return 0;
         }
         startSources(mixer);
@@ -790,7 +832,7 @@
         if (!mixer.clock.playing) {
             return 0;
         }
-        mixer.clock.pause(now());
+        mixer.clock.pause(smoothNow());
         stopSources(mixer);
         return 0;
     }
@@ -802,7 +844,7 @@
         }
         var wasPlaying = mixer.clock.playing;
         if (wasPlaying) {
-            mixer.clock.pause(now());
+            mixer.clock.pause(smoothNow());
             stopSources(mixer);
         }
         mixer.clock.seek(position);
@@ -815,7 +857,7 @@
 
     function getPosition(id) {
         var mixer = mixers[id];
-        return mixer ? mixer.clock.position(now()) : 0;
+        return mixer ? mixer.clock.position(smoothNow()) : 0;
     }
 
     function setSpeed(id, rate) {
@@ -823,11 +865,13 @@
         if (!mixer || !(rate > 0) || rate === mixer.clock.rate) {
             return;
         }
-        var t = now();
+        // The same clock getPosition reads, so the position stays continuous across the change for the game
+        var t = smoothNow();
         mixer.clock.setRate(t, rate);
+        var at = Math.max(t, now());
         mixer.stems.forEach(function (stem) {
             if (stem.source) {
-                stem.source.playbackRate.setValueAtTime(rate, t);
+                stem.source.playbackRate.setValueAtTime(rate, at);
             }
         });
         if (mixer.clock.playing) {
