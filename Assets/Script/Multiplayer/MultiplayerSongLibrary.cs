@@ -10,6 +10,7 @@ using YARG.Multiplayer.Protocol;
 using YARG.Multiplayer.SongShare;
 using YARG.Settings;
 using YARG.Song;
+using YARG.Song.Web;
 
 namespace YARG.Multiplayer
 {
@@ -19,9 +20,17 @@ namespace YARG.Multiplayer
     public static class MultiplayerSongLibrary
     {
         /// <summary>
-        /// Everything here is deleted when leaving a session and at startup.
+        /// Everything here is deleted when leaving a session and at startup. On the web it is in the in-memory
+        /// file system, since the persistent data path there is IndexedDB.
         /// </summary>
-        public static string TempRoot => Path.Combine(PathHelper.PersistentDataPath, "Multiplayer Temp");
+        public static string TempRoot => PlatformInfo.IsWeb
+            ? WEB_TEMP_ROOT
+            : Path.Combine(PathHelper.PersistentDataPath, "Multiplayer Temp");
+
+        private const string WEB_TEMP_ROOT = "/tmp/yarg-mp";
+
+        // The web song loader's own folder; each download gets a subfolder
+        private const string WEB_SONGS_ROOT = "/tmp/yarg-song";
 
         public static string StagingRoot  => Path.Combine(TempRoot, "Staging");
         public static string PackagesRoot => Path.Combine(TempRoot, "Packages");
@@ -78,6 +87,13 @@ namespace YARG.Multiplayer
 #nullable enable
         public static SongEntry? FindByHash(HashWrapper hash)
         {
+            // The web has no library, only the one song loaded (picked by the host, downloaded by a client)
+            if (PlatformInfo.IsWeb)
+            {
+                var current = WebSongLoader.Current;
+                return current != null && current.Hash.Equals(hash) ? current : null;
+            }
+
             // The cache keeps listing songs whose files were deleted (temp downloads are) until a
             // full rescan, and claiming one of those would make loading fail mid-match
             if (SongContainer.SongsByHash.TryGetValue(hash, out var songs))
@@ -118,12 +134,33 @@ namespace YARG.Multiplayer
         /// </summary>
         public static async UniTask<SongEntry?> InstallAndRegister(SongReceiver receiver, SongOffer offer)
         {
+            if (PlatformInfo.IsWeb)
+            {
+                return await InstallForWeb(receiver, offer);
+            }
+
             string root = DownloadRoot;
-            string path = await UniTask.RunOnThreadPool(() => receiver.Install(root));
+            string path = await PlatformTask.Run(() => receiver.Install(root));
             YargLogger.LogFormatInfo("Installed multiplayer song to {0}", path);
 
             await SongContainer.RunRefresh(false);
             return FindByHash(offer.Hash);
+        }
+
+        /// <summary>
+        /// Installs into the in-memory file system and loads it as the one current song, replacing the last one
+        /// (only one song fits in the page's memory comfortably).
+        /// </summary>
+        private static async UniTask<SongEntry?> InstallForWeb(SongReceiver receiver, SongOffer offer)
+        {
+            WebSongLoader.Clear();
+
+            string root = Path.Combine(WEB_SONGS_ROOT, "mp-" + SongShareNaming.HashHex(offer.Hash)).Replace('\\', '/');
+            string path = await PlatformTask.Run(() => receiver.Install(root));
+            YargLogger.LogFormatInfo("Installed multiplayer song to {0}", path);
+
+            var entry = await PlatformTask.Run(() => WebSongLoader.LoadFromPath(path));
+            return entry != null && entry.Hash.Equals(offer.Hash) ? entry : null;
         }
 #nullable disable
     }

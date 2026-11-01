@@ -3,6 +3,7 @@ using Cysharp.Threading.Tasks;
 using UnityEngine;
 using YARG.Core;
 using YARG.Core.Extensions;
+using YARG.Helpers;
 using YARG.Helpers.Extensions;
 using YARG.Core.Song;
 using YARG.Localization;
@@ -49,6 +50,13 @@ namespace YARG.Multiplayer
             if (activePlayers > 1)
             {
                 ShowError("Menu.Multiplayer.OnePlayerOnly");
+                return;
+            }
+
+            // The web joins password rooms on the relay instead of an address
+            if (PlatformInfo.IsWeb)
+            {
+                MultiplayerWebMenu.OpenRoomBrowser();
                 return;
             }
 
@@ -216,13 +224,25 @@ namespace YARG.Multiplayer
 
             if (session is HostSession host)
             {
-                _lobby.AddListButton(Localize.Key("Menu.Multiplayer.ChooseSong"), () =>
+                if (PlatformInfo.IsWeb)
                 {
-                    CloseLobby();
-                    var menu = MenuManager.Instance.PushMenu(MenuManager.Menu.MusicLibrary, false);
-                    MusicLibraryMenu.LibraryMode = MusicLibraryMode.QuickPlay;
-                    menu.gameObject.SetActive(true);
-                }, false);
+                    // No library on the web: the host uploads the song
+                    _lobby.AddListButton(Localize.Key("Menu.Multiplayer.Web.PickSong"), () =>
+                    {
+                        CloseLobby();
+                        MultiplayerWebMenu.PickAndOfferSong().Forget();
+                    }, false);
+                }
+                else
+                {
+                    _lobby.AddListButton(Localize.Key("Menu.Multiplayer.ChooseSong"), () =>
+                    {
+                        CloseLobby();
+                        var menu = MenuManager.Instance.PushMenu(MenuManager.Menu.MusicLibrary, false);
+                        MusicLibraryMenu.LibraryMode = MusicLibraryMode.QuickPlay;
+                        menu.gameObject.SetActive(true);
+                    }, false);
+                }
 
                 _lobby.AddListButton(Localize.Key("Menu.Multiplayer.Start"), () =>
                 {

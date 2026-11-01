@@ -16,8 +16,10 @@ using YARG.Menu.ScoreScreen;
 using YARG.Multiplayer.AutoTest;
 using YARG.Multiplayer.Protocol;
 using YARG.Multiplayer.Session;
+using YARG.Multiplayer.Transport;
 using YARG.Player;
 using YARG.Song;
+using YARG.Song.Web;
 
 namespace YARG.Multiplayer
 {
@@ -31,6 +33,9 @@ namespace YARG.Multiplayer
     /// that misses on purpose between those song seconds). Stem mute changes and the band result are logged too.
     /// Every step is logged with an "[AutoTest]" prefix and the
     /// game quits when the run is over ("[AutoTest] PASS" or "[AutoTest] FAIL ...").
+    /// On the web, <c>-mp-autotest webhost</c> creates the relay room <c>-mp-room name</c> with <c>-mp-password p</c>
+    /// and plays the song loaded into the page, and <c>-mp-autotest webjoin</c> joins that room by name, first trying
+    /// <c>-mp-wrong-password p</c> (which must be refused) when given. Both exist only in builds with <c>YARG_WEB_TEST_HOOKS</c>. The relay is <c>-relay url</c> or the page's origin.
     /// </summary>
     public static class MultiplayerAutoTest
     {
@@ -149,12 +154,23 @@ namespace YARG.Multiplayer
             _expectLeave = Array.IndexOf(args, "-mp-expect-leave") >= 0;
             try
             {
+                int rounds = int.Parse(GetArg(args, "-mp-rounds", "1"));
+                int players = int.Parse(GetArg(args, "-mp-players", "2"));
+                string room = GetArg(args, "-mp-room", "AutoTest");
+                string password = GetArg(args, "-mp-password", "autotest");
                 passed = role switch
                 {
-                    "host"    => await RunHost(GetArg(args, "-mp-song", ""), int.Parse(GetArg(args, "-mp-rounds", "1")),
-                        int.Parse(GetArg(args, "-mp-players", "2"))),
+                    "host"    => await RunHost(() => UniTask.FromResult(MultiplayerManager.Instance.Host()),
+                        () => FindLibrarySong(GetArg(args, "-mp-song", "")), rounds, players),
                     "offline" => await RunOffline(GetArg(args, "-mp-song", ""), int.Parse(address)),
-                    _         => await RunClient(address),
+#if YARG_WEB_TEST_HOOKS
+                    "webhost" => await RunHost(() => CreateWebRoom(room, password, players), WaitForWebSong, rounds,
+                        players),
+                    "webjoin" => await RunClient(
+                        () => JoinWebRoom(room, password, GetArg(args, "-mp-wrong-password", null)), room),
+#endif
+                    _         => await RunClient(() => UniTask.FromResult(MultiplayerManager.Instance.Join(address)),
+                        address),
                 };
             }
             catch (Exception e)
@@ -528,7 +544,115 @@ namespace YARG.Multiplayer
             $"sp-revives={stats.StarPowerRevives} " +
             $"sp-time={stats.TimeInStarPower:0.0}s sp-score={stats.StarPowerScore} solo={stats.SoloBonuses} max-combo={stats.MaxCombo}";
 
-        private static async UniTask<bool> RunHost(string songName, int rounds, int players)
+        private static UniTask<SongEntry> FindLibrarySong(string songName)
+        {
+            var song = SongContainer.UnfilteredSongs
+                .Where(s => s.SubType == EntryType.Ini || s.SubType == EntryType.Sng)
+                .FirstOrDefault(s => songName.Length == 0 ||
+                    s.Name.Original.IndexOf(songName, StringComparison.OrdinalIgnoreCase) >= 0);
+            if (song == null)
+            {
+                Log($"FAIL: no shareable song matching '{songName}'");
+            }
+            return UniTask.FromResult(song);
+        }
+
+#if YARG_WEB_TEST_HOOKS
+        // Only test builds of the web accept the -mp-* page arguments
+        /// <summary>
+        /// The web has no library: the song is the one loaded into the page (the smoke test calls
+        /// <c>window.yargTest.loadSongFromUrl</c>, the player would use "Choose Song...").
+        /// </summary>
+        private static async UniTask<SongEntry> WaitForWebSong()
+        {
+            if (!await WaitFor("a song loaded into the page", () => WebSongLoader.Current != null))
+            {
+                return null;
+            }
+            Log($"Loaded song: {WebSongLoader.Current.Name.Original}");
+            return WebSongLoader.Current;
+        }
+
+        private static async UniTask<bool> CreateWebRoom(string room, string password, int players)
+        {
+            var transport = MultiplayerWebMenu.CreateTransport();
+            try
+            {
+                string id = await MultiplayerWebMenu.WaitForRelay(transport,
+                    transport.CreateRoomAsync(room, password, Math.Max(2, players)));
+                Log($"Created room {room} ({id})");
+            }
+            catch (RelayException e)
+            {
+                Log($"FAIL: couldn't create the room: {e.Message}");
+                transport.Dispose();
+                return false;
+            }
+
+            MultiplayerManager.Instance.HostWeb(transport);
+            return true;
+        }
+
+        /// <summary>
+        /// Finds the room by name (waiting for the host to create it), optionally checks that a wrong password is
+        /// refused, then joins with the right one.
+        /// </summary>
+        private static async UniTask<bool> JoinWebRoom(string roomName, string password, string wrongPassword)
+        {
+            var transport = MultiplayerWebMenu.CreateTransport();
+            try
+            {
+                RelayRoom room = null;
+                float deadline = Time.realtimeSinceStartup + (float) STEP_TIMEOUT;
+                while (room == null)
+                {
+                    var rooms = await MultiplayerWebMenu.WaitForRelay(transport, transport.ListRoomsAsync());
+                    room = rooms.FirstOrDefault(r => r.Name == roomName);
+                    if (room == null)
+                    {
+                        if (Time.realtimeSinceStartup >= deadline)
+                        {
+                            Log($"FAIL: timed out waiting for the room {roomName}");
+                            transport.Dispose();
+                            return false;
+                        }
+                        await UniTask.Delay(TimeSpan.FromSeconds(1));
+                    }
+                }
+                Log($"Found room {roomName} ({room.Id}) with {room.Players}/{room.MaxPlayers} players");
+
+                if (wrongPassword != null)
+                {
+                    try
+                    {
+                        await MultiplayerWebMenu.WaitForRelay(transport, transport.JoinRoomAsync(room.Id, wrongPassword));
+                        Log("FAIL: the wrong password was accepted");
+                        transport.Dispose();
+                        return false;
+                    }
+                    catch (RelayException e) when (e.Code == RelayException.WRONG_PASSWORD)
+                    {
+                        Log("Wrong password refused");
+                    }
+                }
+
+                await MultiplayerWebMenu.WaitForRelay(transport, transport.JoinRoomAsync(room.Id, password));
+                Log($"Joined room {roomName} as peer {transport.LocalPeerId}");
+            }
+            catch (RelayException e)
+            {
+                Log($"FAIL: couldn't join the room: {e.Message}");
+                transport.Dispose();
+                return false;
+            }
+
+            MultiplayerManager.Instance.JoinWeb(transport);
+            return true;
+        }
+#endif
+
+        private static async UniTask<bool> RunHost(Func<UniTask<bool>> startHosting, Func<UniTask<SongEntry>> findSong,
+            int rounds, int players)
         {
             if (!await PrepareLocalPlayer())
             {
@@ -536,7 +660,7 @@ namespace YARG.Multiplayer
             }
 
             var manager = MultiplayerManager.Instance;
-            if (!manager.Host())
+            if (!await startHosting())
             {
                 Log("FAIL: couldn't host");
                 return false;
@@ -549,13 +673,9 @@ namespace YARG.Multiplayer
                 return false;
             }
 
-            var song = SongContainer.UnfilteredSongs
-                .Where(s => s.SubType == EntryType.Ini || s.SubType == EntryType.Sng)
-                .FirstOrDefault(s => songName.Length == 0 ||
-                    s.Name.Original.IndexOf(songName, StringComparison.OrdinalIgnoreCase) >= 0);
+            var song = await findSong();
             if (song == null)
             {
-                Log($"FAIL: no shareable song matching '{songName}'");
                 return false;
             }
 
@@ -689,7 +809,7 @@ namespace YARG.Multiplayer
             return true;
         }
 
-        private static async UniTask<bool> RunClient(string address)
+        private static async UniTask<bool> RunClient(Func<UniTask<bool>> join, string address)
         {
             if (!await PrepareLocalPlayer())
             {
@@ -697,7 +817,7 @@ namespace YARG.Multiplayer
             }
 
             var manager = MultiplayerManager.Instance;
-            if (!manager.Join(address))
+            if (!await join())
             {
                 Log("FAIL: couldn't join");
                 return false;

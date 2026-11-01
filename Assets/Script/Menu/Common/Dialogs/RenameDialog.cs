@@ -39,5 +39,14 @@ namespace YARG.Menu.Dialogs
         {
             _inputField.ActivateInputField();
         }
+
+        /// <summary>
+        /// Masks the typed text, for passwords.
+        /// </summary>
+        public void SetPasswordMode()
+        {
+            _inputField.contentType = TMP_InputField.ContentType.Password;
+            _inputField.ForceLabelUpdate();
+        }
     }
 }

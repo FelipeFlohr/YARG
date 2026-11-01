@@ -25,7 +25,13 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The relay runs in-process for the WebSocketTransport tests -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="../../YARG.Core/YARG.Core/YARG.Core.csproj" />
+    <ProjectReference Include="../../Server/YARG.Relay/YARG.Relay.csproj" />
   </ItemGroup>
 
 </Project>
