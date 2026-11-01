@@ -55,7 +55,8 @@ Branch `claude/web-port`, com tudo commitado (`16b7c276`, `ddda08cd` e este regi
 1. Pendências menores registradas em `.superpowers/sdd/2026-10-31-web-port-1-boot/final-review.md` (14 Minors).
 2. Com o usuário:
    - push e PRs (primeiro o Core em `FelipeFlohr/YARG.Core`, depois o YARG em `FelipeFlohr/YARG`, contra `master`), marcando as mudanças de UI como "não verificadas visualmente";
-   - deploy do relay na VPS e hospedagem do build web (os arquivos `.br` pedem `Content-Encoding: br`).
+   - deploy do relay na VPS e hospedagem do build web: pronto em `deploy/` (Docker Compose com relay, Caddy e um
+     sidecar Tailscale com HTTPS no tailnet; ver `deploy/README.md`); falta rodar na VPS.
 
 ## Como retomar
 
