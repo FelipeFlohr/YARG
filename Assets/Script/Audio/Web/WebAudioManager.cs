@@ -18,11 +18,13 @@ namespace YARG.Audio.Web
         private const string DEFAULT_OUTPUT_DEVICE = "Default";
         private const string DEFAULT_MICROPHONE    = "Default microphone";
 
-        // Requests from window.yargAudioDebug (YargWebAudio.jspre debugRequests)
+#if YARG_WEB_TEST_HOOKS
+        // Requests from window.yargAudioDebug (YargWebAudio.jspre debugRequests), served only in test builds
         private const int DEBUG_TONE_START = 1;
         private const int DEBUG_TONE_STOP  = 2;
         private const int DEBUG_MIC_START  = 3;
         private const int DEBUG_MIC_STOP   = 4;
+#endif
 
         // What decodeAudioData reads in every major browser (AIFF is not one of them)
         private static readonly string[] FORMATS =
@@ -37,8 +39,10 @@ namespace YARG.Audio.Web
         private readonly List<WebStemMixer> _mixers = new();
         private readonly List<WebMicDevice> _mics   = new();
 
+#if YARG_WEB_TEST_HOOKS
         private WebStemMixer? _debugTone;
         private WebMicDevice? _debugMic;
+#endif
 
         public WebAudioManager()
         {
@@ -93,12 +97,6 @@ namespace YARG.Audio.Web
                 }
 
                 mic.Update();
-            }
-
-            if (_debugMic != null)
-            {
-                // Nobody plays the test microphone: its pitch only goes to the debug hooks
-                _debugMic.ClearOutputQueue();
             }
 
             ServeDebugRequests();
@@ -299,11 +297,21 @@ namespace YARG.Audio.Web
             return null;
         }
 
+        // The tone and mic tests start audio, so release builds drop the requests (the read-only probes stay)
         private void ServeDebugRequests()
         {
+#if YARG_WEB_TEST_HOOKS
+            if (_debugMic != null)
+            {
+                // Nobody plays the test microphone: its pitch only goes to the debug hooks
+                _debugMic.ClearOutputQueue();
+            }
+#endif
+
             int request;
             while ((request = WebAudioNative.WebAudio_DebugTakeRequest()) != 0)
             {
+#if YARG_WEB_TEST_HOOKS
                 switch (request)
                 {
                     case DEBUG_TONE_START:
@@ -321,8 +329,13 @@ namespace YARG.Audio.Web
                         _debugMic = null;
                         break;
                 }
+#else
+                YargLogger.LogFormatWarning("[WebAudio] Ignored debug request {0}: this is not a test build", request);
+#endif
             }
         }
+
+#if YARG_WEB_TEST_HOOKS
 
         // Plays a tone generated in JS through the same path as a song: AddChannel, decode, Play
         private void StartToneTest()
@@ -371,11 +384,15 @@ namespace YARG.Audio.Web
             _debugMic.IsRecordingOutput = true;
             YargLogger.LogInfo("[WebAudio] Mic test started");
         }
+#endif
 
         protected override void DisposeManagedResources()
         {
+#if YARG_WEB_TEST_HOOKS
             _debugTone?.Dispose();
             _debugTone = null;
+            _debugMic = null;
+#endif
 
             foreach (var mic in _mics.ToArray())
             {
@@ -383,7 +400,6 @@ namespace YARG.Audio.Web
             }
 
             _mics.Clear();
-            _debugMic = null;
         }
     }
 }

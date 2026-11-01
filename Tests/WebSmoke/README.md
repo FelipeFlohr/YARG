@@ -23,7 +23,8 @@ on an error screen (`#yarg-error`) or on any `console.error` that contains `Exce
 ## Audio, microphone and frame time (`audio.spec.mjs`)
 
 Uses the debug hooks of `YargWebAudio.jspre` (`window.yargAudioDebug`, `window.yargPerf`; see
-`docs/superpowers/specs/2026-11-01-web-port-2-audio-design.md`):
+`docs/superpowers/specs/2026-11-01-web-port-2-audio-design.md`). The tone and microphone tests need a test build
+(`-webDev` or `-webTestHooks`, which define `YARG_WEB_TEST_HOOKS`); a release build ignores those requests.
 
 - **Tone**: `requestToneTest()` makes the C# side load a generated 440 Hz tone through the real mixer path. Checks
   master and stem RMS, that the song time is `(ctx.currentTime - t0) * rate + offset` and advances with the context

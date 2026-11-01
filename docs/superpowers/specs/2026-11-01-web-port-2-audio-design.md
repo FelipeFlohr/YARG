@@ -59,6 +59,9 @@ Complementa as seções 4.1–4.5 de `2026-10-31-web-port-design.md`. Só o que 
     master por um tap `AudioWorklet`), `mic()` (RMS de entrada e último pitch que o C# detectou), e
     `requestToneTest(seconds)` / `requestMicTest()` que o C# atende no próximo frame criando um mixer de verdade
     (bytes WAV gerados no JS, passados pelo mesmo `AddChannel`) ou um `WebMicDevice` de verdade.
+    Esses dois mudam estado, então o C# só os atende em builds de teste (`YARG_WEB_TEST_HOOKS`, definido por
+    `-webDev`/`-webTestHooks`); no release o pedido é descartado com um aviso no log. As sondas só de leitura
+    (e a gravação do master) ficam no release.
     `yargPerf`: média/p95 dos deltas de `requestAnimationFrame` numa janela de 120 frames.
 
 ## Fora daqui

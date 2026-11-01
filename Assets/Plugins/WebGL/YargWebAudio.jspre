@@ -1440,7 +1440,8 @@
         "micDevices": function () {
             return micDevices.slice();
         },
-        // Asks the C# side to load a generated tone through the real mixer path (WebAudioManager.Update)
+        // Asks the C# side to load a generated tone through the real mixer path (WebAudioManager.Update).
+        // The tone and mic tests are served only by test builds (YARG_WEB_TEST_HOOKS); release ignores them.
         "requestToneTest": function (seconds, frequency) {
             if (!ensureContext()) {
                 return false;
