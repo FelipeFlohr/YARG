@@ -35,3 +35,24 @@ YARG_WEB_BUILD=~/yarg-build-web-dev npx playwright test
 ```
 
 Never deploy a `-webDev` build; the normal build (no flag) is the release one.
+
+## Online multiplayer (`multiplayer.spec.mjs`)
+
+Plays a match between two pages (separate browser contexts, so separate `localStorage`) through a local relay. It
+starts `Server/YARG.Relay` with `dotnet run` on `YARG_RELAY_PORT` (default `8090`) and passes `?relay=ws://…` to
+both pages, which run the in-game autotest:
+
+- host: `?mp-autotest=webhost&mp-room=SmokeRoom&mp-password=…&mp-players=2&mp-profile=Host&mp-bot=1`
+- client: `?mp-autotest=webjoin&mp-room=SmokeRoom&mp-password=…&mp-wrong-password=errada&mp-profile=Cliente&mp-bot=1`
+
+The test checks that the wrong password is refused before the right one joins, loads the song on the host with
+`window.yargTest.loadSongFromUrl` (the song loader's hook), waits for the client to install it under
+`/tmp/yarg-song/mp-…`, takes screenshots of both pages in gameplay and on the results screen (attached to the
+report, also in `test-results/`), and expects `[AutoTest] PASS` on both. Any `[AutoTest] FAIL` fails it at once.
+
+The song is `fixtures/song-build/web-fixture.sng` from `fixtures/make-song.mjs` (served at `/__fixtures/`), or
+`YARG_WEB_SONG_URL`.
+
+```bash
+npx playwright test multiplayer.spec.mjs
+```

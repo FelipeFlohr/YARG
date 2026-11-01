@@ -348,6 +348,31 @@
             "PressAgainToLeave": "Press pause again to leave the match.",
             "WaitingForPlayers": "Waiting for the other players: {0}",
             "WaitingForPlayersToFinish": "Waiting for the other players to finish: {0}",
+            "Web": {
+                "Rooms": "Online Rooms",
+                "NoRooms": "No rooms yet. Create one!",
+                "Room": "🔒 {0}  {1}/{2}",
+                "InMatch": " (in a match)",
+                "CreateRoom": "Create Room",
+                "Refresh": "Refresh",
+                "RoomName": "Room name",
+                "RoomPassword": "Room password",
+                "MaxPlayers": "Maximum players",
+                "Players": "{0} players",
+                "JoinPassword": "Password for {0}",
+                "PickSong": "Choose Song...",
+                "SongLoadFailed": "Could not load the song: {0}",
+                "Error": {
+                    "wrong_password": "Wrong password.",
+                    "full": "The room is full.",
+                    "not_found": "The room no longer exists.",
+                    "rate_limited": "Too many wrong passwords. Wait a minute and try again.",
+                    "too_large": "The server refused a message that was too large.",
+                    "too_many_rooms": "You already have too many open rooms.",
+                    "connection_lost": "Could not reach the server: {0}",
+                    "Other": "The server refused the request: {0}"
+                }
+            },
             "Status": {
                 "Idle": "Waiting",
                 "MissingSong": "Missing song",
