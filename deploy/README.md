@@ -1,11 +1,11 @@
 # Deploying the web build (VPS + Tailscale)
 
-One `docker compose up -d --build` in this folder runs YARG's browser build for friends on a Tailscale tailnet:
+`start.sh` (a checked `docker compose up -d --build`) in this folder runs YARG's browser build for friends on a Tailscale tailnet:
 
 | Service | What it does |
 |---|---|
 | `relay` | `Server/YARG.Relay` (the multiplayer WebSocket relay), built from source. Only reachable inside the stack. |
-| `web` | Caddy. Serves the WebGL build from a bind-mounted folder (`YARG_WEB_BUILD`, default `./web`) with the right headers for Unity's `*.br` files, and proxies `/ws` to the relay on the same origin. Plain HTTP, published on `127.0.0.1:8080` of the host. |
+| `web` | Caddy. Serves the WebGL build from a bind-mounted folder (`YARG_WEB_BUILD`, default `./volume/web`) with the right headers for Unity's `*.br` files, and proxies `/ws` to the relay on the same origin. Plain HTTP, published on `127.0.0.1:8080` of the host. |
 | `tailscale` | (profile `tailnet`) Joins the tailnet as `yarg` and serves `https://yarg.<tailnet>.ts.net` → `http://web:80` with a real certificate. |
 
 The game connects to `/ws` on its own origin (`wss:` on an HTTPS page), so nothing in the build has to know the
@@ -59,8 +59,8 @@ In https://login.tailscale.com/admin:
    in the owner's tailnet: `tailscale serve` on the dev PC got a valid certificate.) Note: certificate names are
    published in the public Certificate Transparency logs, so `yarg.<tailnet>.ts.net` becomes publicly known,
    though only tailnet members can reach it.
-2. **Settings → Keys** → **Generate auth key**. Reusable is not needed (the node key is kept in the `ts_state`
-   volume); pre-approved if device approval is on. Optionally tag it (`tag:yarg`; the tag has to be declared in
+2. **Settings → Keys** → **Generate auth key**. Reusable is not needed (the node key is kept in
+   `volume/tailscale`); pre-approved if device approval is on. Optionally tag it (`tag:yarg`; the tag has to be declared in
    the policy file under `tagOwners`), which also disables key expiry for the node.
 3. Friends: either invite them to the tailnet (**Users → Invite**), or share only this machine with their own
    tailnet (**Machines → yarg → Share**). With a restrictive access policy, allow them to reach the machine on
@@ -68,30 +68,38 @@ In https://login.tailscale.com/admin:
 
 ## On the VPS
 
-1. Install Docker with the compose plugin.
-2. Copy this folder and the relay source, keeping their relative layout (`compose.yaml` builds
-   `../Server/YARG.Relay`), plus the build into `deploy/web`. From the Windows PC (Git Bash, needs only ssh and tar):
+1. Install Docker with the compose plugin, and git.
+2. Clone the repository. The stack only needs `deploy/` and `Server/YARG.Relay`, so skip the game's LFS assets
+   and history:
 
    ```bash
-   deploy/publish.sh user@vps          # build from ~/yarg-build-web, to /opt/yarg; SKIP_UP=1 the first time
+   GIT_LFS_SKIP_SMUDGE=1 git clone --depth 1 https://github.com/FelipeFlohr/YARG.git yarg
    ```
 
-   Or by hand: `/opt/yarg/deploy/*`, `/opt/yarg/Server/YARG.Relay/*`, and the build (the folder with
-   `index.html`, `Build/`, `StreamingAssets/`, `TemplateData/`) in `/opt/yarg/deploy/web`. Use a release build
-   (`Editor.WebBuild.Build` without `-webDev`); `publish.sh` refuses a build without `Build/*.wasm.br`.
-3. `cd /opt/yarg/deploy && cp .env.example .env`, then put the auth key in `TS_AUTHKEY` (and change `TS_HOSTNAME`
-   if you want another name).
-4. `docker compose up -d --build`
-5. Check:
+3. `yarg/deploy/start.sh` once: it creates `deploy/.env` from `.env.example` and stops. Put the auth key in
+   `TS_AUTHKEY` (and change `TS_HOSTNAME` if you want another name).
+4. Copy the game build into `yarg/deploy/volume/web` yourself (scp, a USB stick, anything): the *contents* of the
+   WebGL build folder, so that `volume/web/index.html` exists next to `Build/`, `StreamingAssets/` and
+   `TemplateData/`. Use a release build (`Editor.WebBuild.Build` without `-webDev`, in `~/yarg-build-web` on the
+   PC); a `-webDev` build has no `Build/*.wasm.br` and `start.sh` warns about it. `deploy/volume/` is in
+   `.gitignore`, so `git pull` never touches it.
+5. `yarg/deploy/start.sh` again: it checks `.env` and the build, then runs `docker compose up -d --build`. The
+   tailnet's node key ends up in `deploy/volume/tailscale` (keep it: without it the next start needs a new auth key).
+6. Check:
    - `docker compose logs tailscale` shows the login and the serve config; the machine appears in the admin console.
    - `curl -I http://127.0.0.1:8080/` on the VPS answers 200, and `curl -i http://127.0.0.1:8080/ws` answers 400
      (not a WebSocket request).
    - From a tailnet device: `https://yarg.<tailnet>.ts.net` loads (the first request may take a few seconds
      while the certificate is issued), and the online menu lists rooms.
 
-Updating: run `deploy/publish.sh user@vps` again. New build files are served at once (`Cache-Control: no-cache`;
-the `web` folder is emptied and refilled in place, because the bind mount follows the folder itself). The relay is normally
-rebuilt and restarted only if its source changed; restarting it closes every open room.
+Updating:
+
+- **New game build:** copy it over `deploy/volume/web` (or delete the folder and copy a new one), then
+  `deploy/start.sh`. Players get it on their next page load (`Cache-Control: no-cache`). The script recreates the
+  `web` container every time, because a bind mount sticks to the folder it found at start, so a folder deleted and
+  copied again would otherwise be invisible to Caddy.
+- **New relay or deploy files:** `deploy/start.sh --update` (a `git pull --ff-only` first). The relay is rebuilt
+  and restarted only if its source changed; restarting it closes every open room.
 
 Logs: `docker compose logs -f relay` (rooms created/closed, with the creator's IP), `docker compose logs web`,
 `docker compose logs tailscale`.
@@ -124,7 +132,7 @@ On Windows give `YARG_WEB_BUILD` as `C:/Users/...`.
 | `TS_HOSTNAME` | `yarg` | machine name on the tailnet |
 | `TS_EXTRA_ARGS` | — | e.g. `--advertise-tags=tag:yarg` |
 | `TS_IMAGE_TAG` | `stable` | `tailscale/tailscale` tag |
-| `YARG_WEB_BUILD` | `./web` | the WebGL build folder |
+| `YARG_WEB_BUILD` | `./volume/web` | the WebGL build folder |
 | `YARG_HTTP_BIND` / `YARG_HTTP_PORT` | `127.0.0.1` / `8080` | the plain HTTP port on the host |
 | `YARG_TRUSTED_PROXIES` | `172.31.250.10/32` | peers whose `X-Forwarded-For` Caddy keeps |
 
@@ -157,6 +165,6 @@ reasonable for this project:
   take hours if it finished, starving the relay while it runs.
 - **Verification**: the build is checked with the Playwright suite on the PC anyway.
 
-So: build on the Windows PC with Unity, copy the folder (`publish.sh`), mount it. If a containerized build is ever
+So: build on the Windows PC with Unity, copy the folder to the server by hand, mount it. If a containerized build is ever
 wanted, it belongs in CI (GameCI on GitHub Actions with a Library cache), producing the folder this stack mounts,
 not on the VPS.

@@ -1,7 +1,7 @@
 # YARG web: the WebGL build and the multiplayer relay on one origin. See README.md in this folder.
 #
 #   relay      Server/YARG.Relay, built from source; only reachable inside the stack.
-#   web        Caddy: the build (bind-mounted, read-only) and /ws proxied to the relay, plain HTTP on port 80.
+#   web        Caddy: the build from ./volume/web (copied there by hand, read-only) and /ws proxied to the relay, plain HTTP on port 80.
 #              Also published on ${YARG_HTTP_BIND}:${YARG_HTTP_PORT} of the host (default 127.0.0.1:8080).
 #   tailscale  (profile "tailnet") joins the tailnet as ${TS_HOSTNAME} and serves
 #              https://${TS_HOSTNAME}.<tailnet>.ts.net -> http://web:80 with a Tailscale certificate.
@@ -33,7 +33,7 @@ services:
       YARG_TRUSTED_PROXIES: ${YARG_TRUSTED_PROXIES:-172.31.250.10/32}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - ${YARG_WEB_BUILD:-./web}:/srv/yarg:ro
+      - ${YARG_WEB_BUILD:-./volume/web}:/srv/yarg:ro
     networks:
       - yarg
 
@@ -45,7 +45,7 @@ services:
     depends_on:
       - web
     environment:
-      # Needed only the first time; the node key is then kept in the ts_state volume
+      # Needed only the first time; the node key is then kept in ./volume/tailscale
       TS_AUTHKEY: ${TS_AUTHKEY:-}
       TS_AUTH_ONCE: "true"
       TS_HOSTNAME: ${TS_HOSTNAME:-yarg}
@@ -56,7 +56,7 @@ services:
       TS_EXTRA_ARGS: ${TS_EXTRA_ARGS:-}
     volumes:
       - ./tailscale-serve.json:/config/serve.json:ro
-      - ts_state:/var/lib/tailscale
+      - ./volume/tailscale:/var/lib/tailscale
     networks:
       yarg:
         # Fixed, so Caddy trusts X-Forwarded-For from this address only (YARG_TRUSTED_PROXIES)
@@ -67,6 +67,3 @@ networks:
     ipam:
       config:
         - subnet: 172.31.250.0/24
-
-volumes:
-  ts_state:
