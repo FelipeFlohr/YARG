@@ -6,6 +6,7 @@ using UnityEngine.UI;
 using YARG.Gameplay.HUD;
 using YARG.Helpers.Extensions;
 using YARG.Player;
+using YARG.Helpers;
 
 namespace YARG.Menu.Persistent
 {
@@ -39,9 +40,7 @@ namespace YARG.Menu.Persistent
 
             var instrumentSprite = player.GetInstrumentSprite();
 
-            _playerInstrumentIcon.sprite = Addressables
-                .LoadAssetAsync<Sprite>(instrumentSprite)
-                .WaitForCompletion();
+            _playerInstrumentIcon.sprite = SyncAddressables.Load<Sprite>(instrumentSprite);
             _playerInstrumentIcon.color = player.GetHarmonyColor();
         }
     }

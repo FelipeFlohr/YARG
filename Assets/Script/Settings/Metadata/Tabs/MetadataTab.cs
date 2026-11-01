@@ -8,6 +8,7 @@ using YARG.Localization;
 using YARG.Menu.Navigation;
 using YARG.Menu.Settings;
 using YARG.Menu.Settings.Visuals;
+using YARG.Helpers;
 
 namespace YARG.Settings.Metadata
 {
@@ -54,9 +55,7 @@ namespace YARG.Settings.Metadata
                     {
                         if (_buttonPrefab == null)
                         {
-                            _buttonPrefab = Addressables
-                                .LoadAssetAsync<GameObject>("SettingTab/Button")
-                                .WaitForCompletion();
+                            _buttonPrefab = SyncAddressables.Load<GameObject>("SettingTab/Button");
                         }
                         // Spawn the button
                         var go = Object.Instantiate(_buttonPrefab, container);
@@ -71,9 +70,7 @@ namespace YARG.Settings.Metadata
                     {
                         if (_textPrefab == null)
                         {
-                            _textPrefab = Addressables
-                                .LoadAssetAsync<GameObject>("SettingTab/Text")
-                                .WaitForCompletion();
+                            _textPrefab = SyncAddressables.Load<GameObject>("SettingTab/Text");
                         }
                         // Spawn in the header
                         var go = Object.Instantiate(_textPrefab, container);

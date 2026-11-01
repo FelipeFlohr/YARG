@@ -16,6 +16,7 @@ using YARG.Menu.Navigation;
 using YARG.Menu.Persistent;
 using YARG.Menu.Settings.Visuals;
 using YARG.Settings.Customization;
+using YARG.Helpers;
 
 // pattern: Imperative Shell
 
@@ -54,9 +55,7 @@ namespace YARG.Settings.Metadata
         {
             if (_smallRoundButtonPrefab == null)
             {
-                _smallRoundButtonPrefab = Addressables
-                    .LoadAssetAsync<GameObject>("Buttons/SmallRoundButton")
-                    .WaitForCompletion();
+                _smallRoundButtonPrefab = SyncAddressables.Load<GameObject>("Buttons/SmallRoundButton");
             }
             return _smallRoundButtonPrefab;
         }
@@ -67,8 +66,7 @@ namespace YARG.Settings.Metadata
             if (prefab == null)
             {
                 string address = subHeader ? "SettingTab/ColorSubHeader" : "SettingTab/ColorGroupHeader";
-                prefab = Addressables.LoadAssetAsync<GameObject>(address)
-                    .WaitForCompletion().GetComponent<ColorPresetHeader>();
+                prefab = SyncAddressables.Load<GameObject>(address).GetComponent<ColorPresetHeader>();
             }
 
             return Object.Instantiate(prefab, container);
@@ -78,9 +76,7 @@ namespace YARG.Settings.Metadata
         {
             if (_headerPrefab == null)
             {
-                _headerPrefab = Addressables
-                    .LoadAssetAsync<GameObject>("SettingTab/Header")
-                    .WaitForCompletion();
+                _headerPrefab = SyncAddressables.Load<GameObject>("SettingTab/Header");
             }
             return _headerPrefab;
         }

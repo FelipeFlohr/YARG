@@ -26,9 +26,7 @@ namespace YARG.Menu.Settings.AllSettings
 
             _categoryTitle.text = Localize.Key("Settings.Tab", tab.Name);
 
-            var sprite = Addressables
-                .LoadAssetAsync<Sprite>($"TabIcons[{tab.Icon}]")
-                .WaitForCompletion();
+            var sprite = SyncAddressables.Load<Sprite>($"TabIcons[{tab.Icon}]");
             _icon.sprite = sprite;
         }
 

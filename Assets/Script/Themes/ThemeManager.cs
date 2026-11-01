@@ -20,14 +20,10 @@ namespace YARG.Themes
         private readonly Dictionary<ThemePreset, ThemeContainer> _themeContainers = new();
         private ThemeContainer _defaultTheme;
 
-        private void Start()
+        private async void Start()
         {
-            if (PlatformInfo.IsWeb)
-            {
-                // Themes are only used by gameplay and the settings preview, and loading the built-in one
-                // needs a synchronous Addressables load, which WebGL does not support
-                return;
-            }
+            // The built-in themes are synchronous Addressables loads, preloaded on the web
+            await SyncAddressables.WhenReady;
 
             // Populate all of the default themes
             foreach (var defaultPreset in ThemePreset.Defaults)

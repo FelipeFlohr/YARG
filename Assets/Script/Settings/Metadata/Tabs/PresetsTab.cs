@@ -14,6 +14,7 @@ using YARG.Menu.Navigation;
 using YARG.Menu.Settings;
 using YARG.Settings.Customization;
 using Object = UnityEngine.Object;
+using YARG.Helpers;
 
 namespace YARG.Settings.Metadata
 {
@@ -171,27 +172,19 @@ namespace YARG.Settings.Metadata
         {
             if (_presetTypeDropdown == null)
             {
-                _presetTypeDropdown = Addressables
-                    .LoadAssetAsync<GameObject>("SettingTab/PresetTypeDropdown")
-                    .WaitForCompletion();
+                _presetTypeDropdown = SyncAddressables.Load<GameObject>("SettingTab/PresetTypeDropdown");
             }
             if (_presetDropdown == null)
             {
-                 _presetDropdown = Addressables
-                    .LoadAssetAsync<GameObject>("SettingTab/PresetDropdown")
-                    .WaitForCompletion();
+                 _presetDropdown = SyncAddressables.Load<GameObject>("SettingTab/PresetDropdown");
             }
             if (_presetActions == null)
             {
-                 _presetActions = Addressables
-                    .LoadAssetAsync<GameObject>("SettingTab/PresetActions")
-                    .WaitForCompletion();
+                 _presetActions = SyncAddressables.Load<GameObject>("SettingTab/PresetActions");
             }
             if (_presetDefaultText == null)
             {
-                 _presetDefaultText = Addressables
-                    .LoadAssetAsync<GameObject>("SettingTab/PresetDefaultText")
-                    .WaitForCompletion();
+                 _presetDefaultText = SyncAddressables.Load<GameObject>("SettingTab/PresetDefaultText");
             }
 
             // Try to get the preset, and if unsuccessful, load the default one instead

@@ -11,6 +11,7 @@ using YARG.Gameplay.Player;
 using YARG.Helpers.Extensions;
 using YARG.Player;
 using YARG.Settings;
+using YARG.Helpers;
 
 namespace YARG.Gameplay.HUD
 {
@@ -48,9 +49,7 @@ namespace YARG.Gameplay.HUD
 
             if (profile.Avatar != null)
             {
-                _instrumentIcon.sprite = Addressables
-                    .LoadAssetAsync<Sprite>("BlankInstrumentIcon")
-                    .WaitForCompletion();
+                _instrumentIcon.sprite = SyncAddressables.Load<Sprite>("BlankInstrumentIcon");
                 _playerAvatar.texture = profile.Avatar.LoadTexture(false);
                 _playerAvatar.gameObject.SetActive(true);
             }
@@ -58,9 +57,7 @@ namespace YARG.Gameplay.HUD
             {
                 _playerAvatar.gameObject.SetActive(false);
                 var spriteName = player.GetInstrumentSprite(GameManager.Song);
-                _instrumentIcon.sprite = Addressables
-                    .LoadAssetAsync<Sprite>(spriteName)
-                    .WaitForCompletion();
+                _instrumentIcon.sprite = SyncAddressables.Load<Sprite>(spriteName);
             }
 
             StartCoroutine(FadeoutCoroutine());
@@ -74,7 +71,7 @@ namespace YARG.Gameplay.HUD
             }
 
             var textureNeedle = $"VocalNeedleTexture/{needleId}";
-            _needleIcon.texture = Addressables.LoadAssetAsync<Texture2D>(textureNeedle).WaitForCompletion();
+            _needleIcon.texture = SyncAddressables.Load<Texture2D>(textureNeedle);
             _instrumentIcon.color = player.GetGameplayIconColor();
             ShowPlayer(player);
         }

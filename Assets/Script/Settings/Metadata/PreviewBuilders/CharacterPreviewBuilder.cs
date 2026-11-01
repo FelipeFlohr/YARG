@@ -40,9 +40,7 @@ namespace YARG.Settings.Metadata
             // Instantiate the world first since we may need it if the user subsequently selects a character
             if (_previewWorld == null)
             {
-                _previewWorld = Addressables
-                    .LoadAssetAsync<GameObject>("SettingPreviews/CharacterPreview")
-                    .WaitForCompletion();
+                _previewWorld = SyncAddressables.Load<GameObject>("SettingPreviews/CharacterPreview");
             }
 
             if (_previewWorld == null)
@@ -111,9 +109,7 @@ namespace YARG.Settings.Metadata
         {
             if (_previewUI == null)
             {
-                _previewUI = Addressables
-                    .LoadAssetAsync<GameObject>("SettingPreviews/CharacterPreviewUI")
-                    .WaitForCompletion();
+                _previewUI = SyncAddressables.Load<GameObject>("SettingPreviews/CharacterPreviewUI");
             }
 
             var go = Object.Instantiate(_previewUI, uiContainer);
@@ -190,9 +186,7 @@ namespace YARG.Settings.Metadata
 
             if (_previewWorld == null)
             {
-                _previewWorld = Addressables
-                    .LoadAssetAsync<GameObject>("SettingPreviews/CharacterPreview")
-                    .WaitForCompletion();
+                _previewWorld = SyncAddressables.Load<GameObject>("SettingPreviews/CharacterPreview");
 
                 // Instantiate the preview prefab
                 var go = Object.Instantiate(_previewWorld, _worldContainer);

@@ -52,7 +52,7 @@ namespace YARG.Menu.MusicLibrary
 
             if (!IconCache.TryGetValue(_iconPath, out var icon))
             {
-                IconCache[_iconPath] = icon = Addressables.LoadAssetAsync<Sprite>(_iconPath).WaitForCompletion();
+                IconCache[_iconPath] = icon = SyncAddressables.Load<Sprite>(_iconPath);
             }
 
             return icon;

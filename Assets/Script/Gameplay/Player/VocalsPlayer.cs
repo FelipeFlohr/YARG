@@ -95,7 +95,7 @@ namespace YARG.Gameplay.Player
             // Needle materials have names starting from 1.
             var needleIndex = (vocalIndex % NEEDLES_COUNT) + 1;
             var materialPath = $"VocalNeedle/{needleIndex}";
-            _needleRenderer.material = Addressables.LoadAssetAsync<Material>(materialPath).WaitForCompletion();
+            _needleRenderer.material = SyncAddressables.Load<Material>(materialPath);
 
             MaterialPropertyInstance.Instance.SetColor(OutlineColorID, VocalTrack.Colors[Player.Profile.HarmonyIndex]);
             MaterialPropertyInstance.Instance.SetFloat(OutlineWidthID, 0f);

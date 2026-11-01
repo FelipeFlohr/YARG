@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.AddressableAssets;
 using YARG.Core;
 using YARG.Menu.Settings;
+using YARG.Helpers;
 
 namespace YARG.Settings.Metadata
 {
@@ -27,9 +28,7 @@ namespace YARG.Settings.Metadata
         {
             if (_information == null)
             {
-                 _information = Addressables
-                    .LoadAssetAsync<GameObject>("SettingPreviews/DMXInformationPanelUI")
-                    .WaitForCompletion();
+                 _information = SyncAddressables.Load<GameObject>("SettingPreviews/DMXInformationPanelUI");
             }
             var go = Object.Instantiate(_information, uiContainer);
             return UniTask.CompletedTask;

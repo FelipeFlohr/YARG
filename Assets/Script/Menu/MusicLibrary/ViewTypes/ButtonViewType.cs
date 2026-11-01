@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Cysharp.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
+using YARG.Helpers;
 
 namespace YARG.Menu.MusicLibrary
 {
@@ -30,7 +31,7 @@ namespace YARG.Menu.MusicLibrary
 
             if (!SPRITES.TryGetValue(id, out _sprite))
             {
-                SPRITES.Add(id, _sprite = Addressables.LoadAssetAsync<Sprite>(iconPath).WaitForCompletion());
+                SPRITES.Add(id, _sprite = SyncAddressables.Load<Sprite>(iconPath));
             }
         }
 

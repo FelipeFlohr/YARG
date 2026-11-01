@@ -771,9 +771,7 @@ namespace YARG.Menu.Filters
         {
             if (_settingsButtonPrefab == null)
             {
-                _settingsButtonPrefab = Addressables
-                    .LoadAssetAsync<GameObject>("SettingTab/Button")
-                    .WaitForCompletion();
+                _settingsButtonPrefab = SyncAddressables.Load<GameObject>("SettingTab/Button");
             }
 
             return _settingsButtonPrefab;

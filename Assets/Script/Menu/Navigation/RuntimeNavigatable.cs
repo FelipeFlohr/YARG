@@ -6,6 +6,7 @@ using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using YARG.Core.Input;
 using YARG.Menu.Settings;
+using YARG.Helpers;
 
 namespace YARG.Menu.Navigation
 {
@@ -42,9 +43,7 @@ namespace YARG.Menu.Navigation
         {
             if (_selectionGradient == null)
             {
-                _selectionGradient = UnityEngine.AddressableAssets.Addressables
-                    .LoadAssetAsync<Sprite>("SelectionGradient")
-                    .WaitForCompletion();
+                _selectionGradient = SyncAddressables.Load<Sprite>("SelectionGradient");
             }
             return _selectionGradient;
         }
@@ -53,9 +52,7 @@ namespace YARG.Menu.Navigation
         {
             if (_buttonOutline == null)
             {
-                _buttonOutline = UnityEngine.AddressableAssets.Addressables
-                    .LoadAssetAsync<Sprite>("ButtonOutline")
-                    .WaitForCompletion();
+                _buttonOutline = SyncAddressables.Load<Sprite>("ButtonOutline");
             }
             return _buttonOutline;
         }

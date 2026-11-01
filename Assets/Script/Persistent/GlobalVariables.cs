@@ -118,10 +118,13 @@ namespace YARG
             Shader.SetGlobalFloat("_IsFading", 1f);
         }
 
-        private void Start()
+        private async void Start()
         {
             SettingsManager.LoadSettings();
             InputManager.Initialize();
+
+            // On the web, synchronous Addressables loads only work on preloaded assets
+            await SyncAddressables.PreloadAsync();
 
             LoadScene(SceneIndex.Menu);
         }

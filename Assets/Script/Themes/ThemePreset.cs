@@ -67,9 +67,7 @@ namespace YARG.Themes
             // Built-in — load via Addressables
             if (DefaultPreset)
             {
-                var themePrefab = Addressables
-                    .LoadAssetAsync<GameObject>(AssetBundleThemePath)
-                    .WaitForCompletion();
+                var themePrefab = SyncAddressables.Load<GameObject>(AssetBundleThemePath);
 
                 return new ThemeContainer(themePrefab, true);
             }

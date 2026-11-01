@@ -9,6 +9,7 @@ using UnityEngine.UI;
 using YARG.Core.Input;
 using YARG.Player;
 using YARG.Settings;
+using YARG.Helpers;
 
 namespace YARG.Gameplay.HUD
 {
@@ -58,7 +59,6 @@ namespace YARG.Gameplay.HUD
         private float                         _lastTrackWidth = -1f;
         private RectTransform                 _panel;
         private YargPlayer                    _player;
-        private AsyncOperationHandle<Sprite>  _iconHandle;
         private IReadOnlyList<PlayerMenuItem> _items = Array.Empty<PlayerMenuItem>();
         private int                           _selectedIndex;
         private int                           _scrollOffset;
@@ -92,10 +92,6 @@ namespace YARG.Gameplay.HUD
             }
 
             _panel.DOKill();
-            if (_iconHandle.IsValid())
-            {
-                Addressables.Release(_iconHandle);
-            }
         }
 
         public void Initialize(YargPlayer player, GameManager gameManager)
@@ -104,8 +100,7 @@ namespace YARG.Gameplay.HUD
             _player.MenuInput += OnMenuInput;
             _headingText.text = player.Profile.Name;
 
-            _iconHandle = Addressables.LoadAssetAsync<Sprite>(player.GetInstrumentSprite());
-            _icon.sprite = _iconHandle.WaitForCompletion();
+            _icon.sprite = SyncAddressables.Load<Sprite>(player.GetInstrumentSprite());
 
             _gameManager = gameManager;
         }

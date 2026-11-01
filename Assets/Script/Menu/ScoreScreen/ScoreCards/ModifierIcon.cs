@@ -3,6 +3,7 @@ using UnityEngine.AddressableAssets;
 using UnityEngine.UI;
 using YARG.Core;
 using YARG.Core.Game;
+using YARG.Helpers;
 
 namespace YARG.Menu.ScoreScreen
 {
@@ -25,9 +26,7 @@ namespace YARG.Menu.ScoreScreen
         public void InitializeCustom(string id)
         {
             // TODO: Try catch doesn't work
-            _icon.sprite = Addressables
-                .LoadAssetAsync<Sprite>($"ModifierIcons[{id}]")
-                .WaitForCompletion();
+            _icon.sprite = SyncAddressables.Load<Sprite>($"ModifierIcons[{id}]");
         }
 
         public static void SpawnEnginePresetIcons(ModifierIcon prefab, Transform parent,

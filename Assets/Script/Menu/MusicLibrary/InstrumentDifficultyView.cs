@@ -5,6 +5,7 @@ using UnityEngine.AddressableAssets;
 using UnityEngine.UI;
 using YARG.Helpers.Extensions;
 using YARG.Settings;
+using YARG.Helpers;
 
 namespace YARG.Menu.MusicLibrary
 {
@@ -55,7 +56,7 @@ namespace YARG.Menu.MusicLibrary
         {
             if (!SpriteCache.TryGetValue(assetKey, out var sprite))
             {
-                SpriteCache[assetKey] = sprite = Addressables.LoadAssetAsync<Sprite>(assetKey).WaitForCompletion();
+                SpriteCache[assetKey] = sprite = SyncAddressables.Load<Sprite>(assetKey);
             }
 
             return sprite;

@@ -4,6 +4,7 @@ using UnityEngine.AddressableAssets;
 using YARG.Core;
 using YARG.Core.Engine.Keys;
 using YARG.Helpers.Extensions;
+using YARG.Helpers;
 
 namespace YARG.Menu.ScoreScreen
 {
@@ -23,8 +24,6 @@ namespace YARG.Menu.ScoreScreen
         // Similarly to the guitar card, we would want to differentiate when
         // keys are used to play a guitar/bass part, but the pro keys icon
         // looks exactly the same as 5L keys when zoomed in here anyway
-        public override Sprite GetInstrumentSprite() => Addressables
-                .LoadAssetAsync<Sprite>("InstrumentIcons[keys]")
-                .WaitForCompletion();
+        public override Sprite GetInstrumentSprite() => SyncAddressables.Load<Sprite>("InstrumentIcons[keys]");
     }
 }
