@@ -3,6 +3,8 @@ import os from 'node:os';
 import path from 'node:path';
 
 const port = Number(process.env.YARG_WEB_PORT || 8089);
+// Specs that measure real play (frame rates, long songs, several pages) run on the GPU project only
+const GPU_SPECS = ['gameplay.spec.mjs', 'songs.spec.mjs', 'lobby.spec.mjs'];
 
 export default defineConfig({
   testDir: '.',
@@ -27,11 +29,11 @@ export default defineConfig({
     },
   },
   projects: [
-    { name: 'chromium', use: { browserName: 'chromium' }, testIgnore: 'gameplay.spec.mjs' },
+    { name: 'chromium', use: { browserName: 'chromium' }, testIgnore: GPU_SPECS },
     {
       // Real GPU (ANGLE on D3D11) in the new headless mode, for frame rate measurements; still muted
       name: 'gpu',
-      testMatch: 'gameplay.spec.mjs',
+      testMatch: GPU_SPECS,
       use: {
         browserName: 'chromium',
         // Installed Edge (temporary profile, headless): the full Chromium download is blocked from running here

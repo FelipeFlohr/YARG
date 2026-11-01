@@ -28,8 +28,14 @@ namespace YARG.Multiplayer.Protocol
         /// </summary>
         public byte Progress { get; }
 
+        /// <summary>
+        /// The player chose a part for the current song; until then <see cref="Instrument"/> and
+        /// <see cref="Difficulty"/> are only defaults.
+        /// </summary>
+        public bool HasPart { get; }
+
         public LobbyPlayer(int playerId, string name, Instrument instrument, Difficulty difficulty,
-            LobbyPlayerStatus status, byte progress)
+            LobbyPlayerStatus status, byte progress, bool hasPart = false)
         {
             PlayerId = playerId;
             Name = name;
@@ -37,6 +43,7 @@ namespace YARG.Multiplayer.Protocol
             Difficulty = difficulty;
             Status = status;
             Progress = progress;
+            HasPart = hasPart;
         }
     }
 }

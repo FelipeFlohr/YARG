@@ -35,7 +35,7 @@ namespace YARG.Multiplayer.Session
             public bool IsParticipant => Status != LobbyPlayerStatus.Left && Status != LobbyPlayerStatus.SongFailed;
 
             public LobbyPlayer ToLobbyPlayer() =>
-                new(PlayerId, Name, Instrument, Difficulty, Status, Progress);
+                new(PlayerId, Name, Instrument, Difficulty, Status, Progress, HasPart);
         }
 
         private sealed class PeerInfo

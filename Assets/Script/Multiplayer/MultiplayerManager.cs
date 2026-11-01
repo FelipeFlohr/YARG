@@ -72,6 +72,11 @@ namespace YARG.Multiplayer
         /// <summary>
         /// The one player on this machine taking part in the session.
         /// </summary>
+        /// <summary>
+        /// Host: the song offered to the room, from this machine's library or upload.
+        /// </summary>
+        public SongEntry? OfferedSong => _offeredSong;
+
         public YargPlayer? LocalPlayer => PlayerContainer.Players.FirstOrDefault(player => !player.SittingOut);
 
         /// <summary>

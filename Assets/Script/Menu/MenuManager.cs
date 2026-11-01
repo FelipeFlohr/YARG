@@ -4,6 +4,7 @@ using System.Linq;
 using UnityEngine;
 using YARG.Helpers;
 using YARG.Menu.Web;
+using YARG.Multiplayer;
 
 namespace YARG.Menu
 {
@@ -25,6 +26,8 @@ namespace YARG.Menu
             GameModes,
             // Web build only, created in code (see WebSongMenu)
             WebSong,
+            // Rooms and lobby of online multiplayer, created in code (see OnlineMenu)
+            Online,
         }
 
         /// <summary>
@@ -60,6 +63,7 @@ namespace YARG.Menu
             {
                 WebSongMenu.Create(transform);
             }
+            OnlineMenu.Create(transform);
 
             // Convert to dictionary with "Menu" as key
             var children = GetComponentsInChildren<MenuObject>(true);
@@ -124,6 +128,18 @@ namespace YARG.Menu
             _openMenus.Push(menu);
 
             return newMenu;
+        }
+
+        /// <summary>Whether <paramref name="menu"/> is anywhere on the stack.</summary>
+        public bool IsOpen(Menu menu) => _openMenus.Contains(menu);
+
+        /// <summary>Pops the menus above <paramref name="menu"/>, so it is the one shown.</summary>
+        public void PopTo(Menu menu)
+        {
+            while (_openMenus.Count > 1 && CurrentMenu != menu && IsOpen(menu))
+            {
+                PopMenu();
+            }
         }
 
         public void PopMenu()
