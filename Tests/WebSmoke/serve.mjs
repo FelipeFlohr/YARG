@@ -4,9 +4,12 @@ import http from 'node:http';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const port = Number(process.env.YARG_WEB_PORT || 8089);
 const root = path.resolve(process.env.YARG_WEB_BUILD || path.join(os.homedir(), 'yarg-build-web'));
+const FIXTURES_PREFIX = '/__fixtures/';
+const fixturesRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures');
 
 const types = {
   '.html': 'text/html; charset=utf-8',
@@ -20,6 +23,7 @@ const types = {
   '.ogg': 'audio/ogg',
   '.opus': 'audio/ogg',
   '.txt': 'text/plain; charset=utf-8',
+  '.zip': 'application/zip',
 };
 
 const server = http.createServer((req, res) => {
@@ -32,8 +36,15 @@ const server = http.createServer((req, res) => {
   }
   if (pathname.endsWith('/')) pathname += 'index.html';
 
-  const file = path.join(root, pathname);
-  if (file !== root && !file.startsWith(root + path.sep)) {
+  // Test fixtures (songs for song.spec.mjs) are served next to the build
+  let base = root;
+  if (pathname.startsWith(FIXTURES_PREFIX)) {
+    base = fixturesRoot;
+    pathname = pathname.slice(FIXTURES_PREFIX.length - 1);
+  }
+
+  const file = path.join(base, pathname);
+  if (file !== base && !file.startsWith(base + path.sep)) {
     res.writeHead(403).end();
     return;
   }

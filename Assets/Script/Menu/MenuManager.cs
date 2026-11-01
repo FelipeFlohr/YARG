@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using YARG.Helpers;
+using YARG.Menu.Web;
 
 namespace YARG.Menu
 {
@@ -21,6 +23,8 @@ namespace YARG.Menu
             CareerList,
             Career,
             GameModes,
+            // Web build only, created in code (see WebSongMenu)
+            WebSong,
         }
 
         /// <summary>
@@ -33,6 +37,7 @@ namespace YARG.Menu
             Menu.History,
             Menu.Content,
             Menu.Career,
+            Menu.WebSong,
         };
 
         /// <summary>
@@ -45,8 +50,17 @@ namespace YARG.Menu
         private readonly Stack<Menu> _openMenus = new();
         private Coroutine _reactivateCoroutine;
 
+        /// <summary>The menu on top of the stack, or <see cref="Menu.None"/>.</summary>
+        public Menu CurrentMenu => _openMenus.TryPeek(out var menu) ? menu : Menu.None;
+
         protected override void SingletonAwake()
         {
+            // The web build has no song library; its song screen has no prefab
+            if (PlatformInfo.IsWeb)
+            {
+                WebSongMenu.Create(transform);
+            }
+
             // Convert to dictionary with "Menu" as key
             var children = GetComponentsInChildren<MenuObject>(true);
             _menus = children.ToDictionary(i => i.Menu, i => i);

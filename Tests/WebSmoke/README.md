@@ -38,6 +38,21 @@ Uses the debug hooks of `YargWebAudio.jspre` (`window.yargAudioDebug`, `window.y
 Artifacts land in each test's folder under `test-results/`. `YARG_WEB_MIN_RMS` (default `0.02`) and
 `YARG_WEB_MIN_FPS` (default `15`, low because of the software renderer) tune the thresholds.
 
+## Song loading (`song.spec.mjs`)
+
+Loads a song from disk the way the player does and saves screenshots (song screen, difficulty select, gameplay,
+score screen, result, errors) to `test-results/`. It needs a test build (`-webDev` or `-webTestHooks`, which
+define `YARG_WEB_TEST_HOOKS`); release builds ignore the song test hooks. The page is opened with `?web-test`, which enables
+`window.yargTest.songCommand` (`bot` adds an active bot player, `play` starts the current song with it).
+
+- `fixtures/song/` holds the chart and `song.ini`; `fixtures/make-song.mjs` (run by the spec) builds
+  `fixtures/song-build/` with the song folder, `web-fixture.zip`, `web-fixture.sng`, `no-audio.zip` and
+  `not-a-song.txt`. The audio is the game's `calibration_music.ogg`; the cover is a generated PNG.
+- `serve.mjs` serves `fixtures/` under `/__fixtures/`.
+- `window.yargTest.loadSongFromUrl(url)` and `loadFolderFromUrls(base, names)` fetch a song, write it to the in-memory
+  filesystem and take the same C# path as a drop. "Load another" goes through the real picker (Playwright's
+  `filechooser` event). `listSongFiles()` lists `/tmp/yarg-song`.
+
 ## Fast builds while iterating
 
 `Editor.WebBuild.Build` takes `-webDev` for an incremental development build (no shader reimport or Addressables clean,

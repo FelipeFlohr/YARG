@@ -1,4 +1,24 @@
 {
+    "WebSong": {
+        "Play": "Jogar",
+        "PlayAgain": "Jogar de novo",
+        "LoadFile": "Carregar música...",
+        "LoadAnother": "Carregar outra",
+        "LoadFolder": "Carregar pasta...",
+        "Hint": "Escolha um arquivo .sng ou .zip, ou a pasta da música (song.ini, notes.mid ou notes.chart e o áudio). Também dá para arrastar para a página.",
+        "Picking": "Escolha a música no navegador...",
+        "NoPlayers": "Adicione um jogador primeiro: Perfis, no menu principal.",
+        "NoParts": "Nenhuma parte jogável",
+        "Charter": "Chart de {0}",
+        "Error": {
+            "UnsupportedFormat": "Formato não suportado. Use um .sng, um .zip ou a pasta da música (arquivos CON não são suportados).",
+            "NoChart": "Nenhum chart encontrado: a música precisa de um song.ini com notes.mid ou notes.chart.",
+            "NoAudio": "A música não tem áudio.",
+            "ParseFailed": "Não foi possível ler o chart: {0}",
+            "TooLarge": "A música passa de 300 MB.",
+            "ReadFailed": "Não foi possível ler os arquivos."
+        }
+    },
     "Language": {
         "Name": "Português (Brasil)",
         "Region": "Brasil",
