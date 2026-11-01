@@ -93,7 +93,9 @@ namespace YARG.Song.Web
             UnityEngine.Object.DontDestroyOnLoad(go);
             _receiver = go.AddComponent<Receiver>();
             WebSongBridge.Init(OBJECT_NAME);
+#if YARG_WEB_TEST_HOOKS
             WebSongTestHooks.Initialize();
+#endif
         }
 
         /// <summary>
@@ -425,9 +427,35 @@ namespace YARG.Song.Web
                 SongDropped?.Invoke(song);
             }
 
+            // window.yargTest.loadSongFromUrl / loadFolderFromUrls: a drop in test builds, refused otherwise
+            private void OnTestDropResult(string message)
+            {
+#if YARG_WEB_TEST_HOOKS
+                OnDropResult(message);
+#else
+                YargLogger.LogWarning("[WebSong] Test hooks are not in this build; ignoring a test song.");
+                try
+                {
+                    string path = ParseMessage(message);
+                    if (path != null)
+                    {
+                        DeleteOwned(path);
+                    }
+                }
+                catch (WebSongLoadException)
+                {
+                    // Already logged
+                }
+#endif
+            }
+
             private void OnTestCommand(string message)
             {
+#if YARG_WEB_TEST_HOOKS
                 WebSongTestHooks.Handle(message);
+#else
+                YargLogger.LogWarning("[WebSong] Test hooks are not in this build; ignoring a test command.");
+#endif
             }
         }
     }

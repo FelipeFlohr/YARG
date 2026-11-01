@@ -1,3 +1,5 @@
+// Test builds only (Editor.WebBuild -webDev or -webTestHooks define YARG_WEB_TEST_HOOKS)
+#if YARG_WEB_TEST_HOOKS
 using System;
 using System.Linq;
 using UnityEngine.SceneManagement;
@@ -14,7 +16,7 @@ namespace YARG.Song.Web
 {
     /// <summary>
     /// Commands from the browser smoke tests (<c>window.yargTest.songCommand</c>), which cannot click through the
-    /// difficulty menu of a fresh profile. Only honored when the page was opened with <c>?web-test</c>.
+    /// difficulty menu of a fresh profile. Only in test builds, and only when the page was opened with <c>?web-test</c>.
     /// </summary>
     internal static class WebSongTestHooks
     {
@@ -135,3 +137,4 @@ namespace YARG.Song.Web
         }
     }
 }
+#endif

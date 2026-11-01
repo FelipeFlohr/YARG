@@ -23,7 +23,8 @@ on an error screen (`#yarg-error`) or on any `console.error` that contains `Exce
 ## Song loading (`song.spec.mjs`)
 
 Loads a song from disk the way the player does and saves screenshots (song screen, difficulty select, gameplay,
-score screen, result, errors) to `test-results/`. The page is opened with `?web-test`, which enables
+score screen, result, errors) to `test-results/`. It needs a test build (`-webDev` or `-webTestHooks`, which
+define `YARG_WEB_TEST_HOOKS`); release builds ignore the song test hooks. The page is opened with `?web-test`, which enables
 `window.yargTest.songCommand` (`bot` adds an active bot player, `play` starts the current song with it).
 
 - `fixtures/song/` holds the chart and `song.ini`; `fixtures/make-song.mjs` (run by the spec) builds

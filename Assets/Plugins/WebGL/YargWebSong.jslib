@@ -284,10 +284,10 @@ var YargWebSongLib = {
                 });
             };
 
-            // Same C# path as dropping a file on the page
+            // Same C# path as dropping a file on the page (OnTestDropResult only answers in test builds)
             hooks.loadSongFromUrl = function (url, name) {
                 return fetchBlob(url).then(function (blob) {
-                    return YargWebSong.deliver("OnDropResult", [{ path: name || nameFromUrl(url), blob: blob }], "file");
+                    return YargWebSong.deliver("OnTestDropResult", [{ path: name || nameFromUrl(url), blob: blob }], "file");
                 });
             };
             // Same C# path as dropping a folder: baseUrl + each relative file name
@@ -295,7 +295,7 @@ var YargWebSongLib = {
                 return Promise.all(names.map(function (name) {
                     return fetchBlob(baseUrl + name).then(function (blob) { return { path: name, blob: blob }; });
                 })).then(function (entries) {
-                    return YargWebSong.deliver("OnDropResult", entries, "folder");
+                    return YargWebSong.deliver("OnTestDropResult", entries, "folder");
                 });
             };
             hooks.listSongFiles = function () {
@@ -304,7 +304,7 @@ var YargWebSongLib = {
             hooks.isSongDropEnabled = function () {
                 return YargWebSong.dropEnabled;
             };
-            // Commands handled by WebSongTestHooks (only with ?web-test)
+            // Commands handled by WebSongTestHooks (test builds with ?web-test only)
             hooks.songCommand = function (command, argument) {
                 YargWebSong.send("OnTestCommand", command + "|" + (argument || ""));
             };
