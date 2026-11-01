@@ -6,19 +6,29 @@ using UnityEditor;
 using UnityEditor.AddressableAssets.Settings;
 using UnityEditor.Build;
 using UnityEditor.Build.Reporting;
+using UnityEditor.WebGL;
 using UnityEngine;
 
 namespace Editor
 {
     /// <summary>
     /// Builds the WebGL player (batchmode).
-    /// Usage: <c>-buildTarget WebGL -executeMethod Editor.WebBuild.Build [-webBuildOutput dir]</c>,
+    /// Usage: <c>-buildTarget WebGL -executeMethod Editor.WebBuild.Build [-webBuildOutput dir] [-webDiagnostics] [-webDev]</c>,
     /// the output defaults to <c>~/yarg-build-web</c>.
+    /// <para>
+    /// <c>-webDev</c> is a fast, incremental build for iterating (not for deploying): it skips the shader graph
+    /// reimport and the Addressables clean, uses a development player with debug IL2CPP, build-time-optimized
+    /// WebAssembly (<c>WasmCodeOptimization.BuildTimes</c>), the 2023 WebAssembly features and no compression
+    /// (the files have no <c>.br</c> extension). Keep the same output folder and do not clean Library/Bee between
+    /// builds. The player settings it changes are restored afterwards, so they never stay in ProjectSettings.asset.
+    /// </para>
     /// Exit codes: 0 on success, 1 when the player build fails, 2 when the Addressables build fails.
     /// </summary>
     public static class WebBuild
     {
         private const string OUTPUT_ARG = "-webBuildOutput";
+        private const string DIAGNOSTICS_ARG = "-webDiagnostics";
+        private const string DEV_ARG = "-webDev";
         private const string YARG_NO_THREADS = "YARG_NO_THREADS";
         private const string ZSTRING_TEXTMESHPRO_SUPPORT = "ZSTRING_TEXTMESHPRO_SUPPORT";
         private const string MANIFEST_NAME = "web-manifest.json";
@@ -42,21 +52,43 @@ namespace Editor
             }
             output = Path.GetFullPath(output).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 
+            bool dev = args.Contains(DEV_ARG);
+            DevSettingsBackup backup = null;
+
             try
             {
-                MultiplayerTestBuild.ReimportShaderGraphs();
+                if (!dev)
+                {
+                    // Only needed on a fresh Library, and it makes every shader recompile
+                    MultiplayerTestBuild.ReimportShaderGraphs();
+                }
 
-                // Addressables content has to be built before the player
-                AddressableAssetSettings.CleanPlayerContent();
+                // Addressables content has to be built before the player (kept incremental in the dev build)
+                if (!dev)
+                {
+                    AddressableAssetSettings.CleanPlayerContent();
+                }
                 AddressableAssetSettings.BuildPlayerContent(out var addressablesResult);
                 if (!string.IsNullOrEmpty(addressablesResult.Error))
                 {
                     Debug.LogError($"[WebBuild] Addressables build failed: {addressablesResult.Error}");
+                    backup?.Restore();
                     EditorApplication.Exit(2);
                     return;
                 }
 
                 ConfigurePlayerSettings();
+
+                if (dev)
+                {
+                    backup = ApplyDevSettings();
+                }
+                Debug.Log($"[WebBuild] codeOptimization: {UserBuildSettings.codeOptimization}");
+
+                // Managed stack traces in the browser console, for finding where an exception comes from
+                PlayerSettings.WebGL.exceptionSupport = args.Contains(DIAGNOSTICS_ARG)
+                    ? WebGLExceptionSupport.FullWithStacktrace
+                    : WebGLExceptionSupport.ExplicitlyThrownExceptionsOnly;
 
                 Directory.CreateDirectory(output);
 
@@ -68,24 +100,73 @@ namespace Editor
                     locationPathName = output,
                     extraScriptingDefines = new[] { YARG_NO_THREADS },
                 };
+                if (dev)
+                {
+                    options.options |= BuildOptions.Development;
+                }
 
                 Debug.Log($"[WebBuild] building {options.scenes.Length} scenes to {options.locationPathName}");
                 var summary = BuildPipeline.BuildPlayer(options).summary;
                 Debug.Log($"[WebBuild] result: {summary.result}, {summary.totalSize} bytes, {summary.totalTime}");
                 if (summary.result != BuildResult.Succeeded)
                 {
+                    backup?.Restore();
                     EditorApplication.Exit(1);
                     return;
                 }
 
                 WriteManifest(Path.Combine(output, "StreamingAssets"));
+                backup?.Restore();
                 EditorApplication.Exit(0);
             }
             catch (Exception e)
             {
                 Debug.LogError($"[WebBuild] failed: {e}");
+                backup?.Restore();
                 EditorApplication.Exit(1);
             }
+            finally
+            {
+                backup?.Restore();
+            }
+        }
+
+        private sealed class DevSettingsBackup
+        {
+            public WebGLCompressionFormat Compression;
+            public bool Wasm2023;
+            public Il2CppCompilerConfiguration Compiler;
+            public Il2CppCodeGeneration CodeGeneration;
+            public WasmCodeOptimization CodeOptimization;
+
+            public void Restore()
+            {
+                PlayerSettings.WebGL.compressionFormat = Compression;
+                PlayerSettings.WebGL.wasm2023 = Wasm2023;
+                PlayerSettings.SetIl2CppCompilerConfiguration(NamedBuildTarget.WebGL, Compiler);
+                PlayerSettings.SetIl2CppCodeGeneration(NamedBuildTarget.WebGL, CodeGeneration);
+                UserBuildSettings.codeOptimization = CodeOptimization;
+                AssetDatabase.SaveAssets();
+            }
+        }
+
+        private static DevSettingsBackup ApplyDevSettings()
+        {
+            var backup = new DevSettingsBackup
+            {
+                Compression = PlayerSettings.WebGL.compressionFormat,
+                Wasm2023 = PlayerSettings.WebGL.wasm2023,
+                Compiler = PlayerSettings.GetIl2CppCompilerConfiguration(NamedBuildTarget.WebGL),
+                CodeGeneration = PlayerSettings.GetIl2CppCodeGeneration(NamedBuildTarget.WebGL),
+                CodeOptimization = UserBuildSettings.codeOptimization,
+            };
+
+            PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Disabled;
+            PlayerSettings.WebGL.wasm2023 = true;
+            PlayerSettings.SetIl2CppCompilerConfiguration(NamedBuildTarget.WebGL, Il2CppCompilerConfiguration.Debug);
+            PlayerSettings.SetIl2CppCodeGeneration(NamedBuildTarget.WebGL, Il2CppCodeGeneration.OptimizeSize);
+            UserBuildSettings.codeOptimization = WasmCodeOptimization.BuildTimes;
+            return backup;
         }
 
         /// <summary>

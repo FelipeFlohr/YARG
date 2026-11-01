@@ -1,4 +1,3 @@
-using Minis;
 using UnityEngine;
 using YARG.Input;
 using YARG.Player;
@@ -41,7 +40,8 @@ namespace YARG.Menu.ProfileInfo
 
             foreach (var control in _binding.Bindings)
             {
-                if (control.Control is MidiNoteControl)
+                // Matched by name: the Minis package is not part of the web build
+                if (control.Control.GetType().Name == "MidiNoteControl")
                 {
                     _header.AddBinding<SingleMidiNoteBindView, float, ButtonBinding, SingleButtonBinding>(
                         _midiNoteViewPrefab, _binding, control);

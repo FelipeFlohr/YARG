@@ -32,6 +32,9 @@ namespace YARG.Audio.Web
 
         protected override bool SetOutputDevice(string name) => false;
 
+        // There is no output to reinitialize, so changing the effects mode has nothing to fail at
+        protected override bool ReinitializeOutput() => true;
+
         protected override void SetMasterVolume(double volume)
         {
         }

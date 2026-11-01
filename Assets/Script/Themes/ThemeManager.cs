@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
 using YARG.Core.Logging;
+using YARG.Helpers;
 using YARG.Gameplay.Visuals;
 using YARG.Settings.Customization;
 
@@ -21,6 +22,13 @@ namespace YARG.Themes
 
         private void Start()
         {
+            if (PlatformInfo.IsWeb)
+            {
+                // Themes are only used by gameplay and the settings preview, and loading the built-in one
+                // needs a synchronous Addressables load, which WebGL does not support
+                return;
+            }
+
             // Populate all of the default themes
             foreach (var defaultPreset in ThemePreset.Defaults)
             {

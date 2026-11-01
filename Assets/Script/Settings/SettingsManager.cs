@@ -434,7 +434,15 @@ namespace YARG.Settings
             catch (Exception e)
             {
                 _settingsCanBeSaved = !settingsFileExists;
-                YargLogger.LogException(e, "Failed to load settings!");
+                if (PlatformInfo.IsWeb && !settingsFileExists)
+                {
+                    // First visit: nothing was stored in the browser yet, which is not an error
+                    YargLogger.LogInfo("No stored settings found, using the defaults");
+                }
+                else
+                {
+                    YargLogger.LogException(e, "Failed to load settings!");
+                }
             }
 
             // If null, recreate
@@ -468,6 +476,12 @@ namespace YARG.Settings
                 }
 
                 settingType.ForceInvokeCallback();
+            }
+
+            if (PlatformInfo.IsWeb && !settingsFileExists)
+            {
+                // Mirror the defaults to the browser right away, so the stored copy exists from the first visit
+                SaveSettings();
             }
         }
 
