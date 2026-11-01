@@ -773,7 +773,7 @@ namespace YARG.Settings
                 DialogManager.Instance.ShowConfirmDeleteDialog("Are you sure you want to remove all cached content?\n\nRemote content you access will be redownloaded, possibly causing loading delays.",
                     () =>
                     {
-                        var result = Caching.ClearCache();
+                        var result = PlatformInfo.ClearAssetBundleCache();
                         if (!result)
                         {
                             YargLogger.LogWarning("Failed to clear some cached items.");
