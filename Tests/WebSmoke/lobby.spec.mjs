@@ -2,13 +2,15 @@
 // password wrong and then right, the host uploads a real song, both choose a part (guitar and bass) and the band
 // plays it. Screenshots of every screen; the two pages must play the song at the same moment, and the host keeps
 // playing when the guest leaves mid-song. Needs a test build, a relay at
-// YARG_WEB_RELAY (e.g. ws://127.0.0.1:8091/ws) and a song in YARG_WEB_SONGS. Runs in the "gpu" project.
+// YARG_WEB_RELAY (e.g. ws://127.0.0.1:8091/ws; with YARG_WEB_BASE_URL the page's own /ws) and a song in
+// YARG_WEB_SONGS. Runs in the "gpu" project.
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
 import { dismissAntiPiracyDialog } from './fixtures/dialogs.mjs';
+import { remoteBaseUrl } from './fixtures/remote.mjs';
 
-const relay = process.env.YARG_WEB_RELAY;
+const relay = process.env.YARG_WEB_RELAY || (remoteBaseUrl ? '' : null);
 const songsDir = process.env.YARG_WEB_SONGS;
 const song = songsDir && fs.existsSync(songsDir)
   ? (process.env.YARG_WEB_LOBBY_SONG || fs.readdirSync(songsDir).filter((f) => /\.(sng|zip)$/i.test(f)).sort()[0])
@@ -76,7 +78,7 @@ async function boot(browser, baseURL, name, instrument) {
   const context = await browser.newContext({ baseURL, viewport: { width: 1280, height: 720 } });
   const page = await context.newPage();
   const log = collectLogs(page);
-  await page.goto(`/?web-test&relay=${encodeURIComponent(relay)}`);
+  await page.goto(relay ? `/?web-test&relay=${encodeURIComponent(relay)}` : '/?web-test');
   await page.locator('#yarg-start').click();
   await log.waitFor('Main menu ready', 170_000);
   await dismissAntiPiracyDialog(page);
@@ -108,7 +110,7 @@ async function songPositionAt(page, mixerId) {
 }
 
 test('two players create, join and play a song online', async ({ browser }, testInfo) => {
-  test.skip(!relay, 'set YARG_WEB_RELAY to the relay\'s ws:// address');
+  test.skip(relay === null, 'set YARG_WEB_RELAY to the relay\'s ws:// address');
   test.skip(!song, 'set YARG_WEB_SONGS to a folder with a .sng or .zip song');
   const baseURL = testInfo.project.use.baseURL;
 

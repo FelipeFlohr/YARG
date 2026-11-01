@@ -1,0 +1,46 @@
+# Serves the WebGL build and proxies /ws to the relay, on one origin, over plain HTTP inside the stack.
+# HTTPS is done in front of it by Tailscale (the tailscale service in compose.yaml, or `tailscale serve` on the host).
+{
+	auto_https off
+	admin off
+
+	servers {
+		# Only these peers may pass X-Forwarded-For through; from anyone else Caddy replaces it with the peer's IP.
+		# Default: the tailscale sidecar's fixed address in compose.yaml, whose `serve` proxy overwrites the header
+		# with the player's tailnet IP. The relay (Relay__TrustForwardedFor) reads the first entry.
+		trusted_proxies static {$YARG_TRUSTED_PROXIES:172.31.250.10/32}
+	}
+}
+
+:80 {
+	# The relay; WebSocket upgrades pass through reverse_proxy as is
+	handle /ws {
+		reverse_proxy relay:8080
+	}
+
+	handle {
+		root * /srv/yarg
+
+		# Unity's precompressed output: served as is, with Content-Encoding and the real type of the file.
+		# (Go leaves out Content-Length when Content-Encoding is set, so these go out chunked.)
+		@br path *.br
+		header @br Content-Encoding br
+		@gz path *.gz
+		header @gz Content-Encoding gzip
+		@wasm path *.wasm.br *.wasm.gz
+		header @wasm Content-Type application/wasm
+		@js path *.js.br *.js.gz
+		header @js Content-Type application/javascript
+		@data path *.data.br *.data.gz
+		header @data Content-Type application/octet-stream
+
+		# The build keeps its file names across deploys; make browsers revalidate (ETag / Last-Modified)
+		header Cache-Control "no-cache"
+
+		# Only what is not compressed already (index.html, TemplateData, uncompressed builds)
+		@plain not path *.br *.gz
+		encode @plain zstd gzip
+
+		file_server
+	}
+}

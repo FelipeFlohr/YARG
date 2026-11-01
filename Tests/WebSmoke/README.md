@@ -15,6 +15,12 @@ npx playwright test
 - `YARG_WEB_BUILD`: build folder, default `~/yarg-build-web` (made by `Editor.WebBuild.Build`, see `docs/`).
 - `YARG_WEB_PORT`: port, default `8089`.
 
+- `YARG_WEB_BASE_URL`: run against an already deployed build instead (for example the `deploy/` stack:
+  `YARG_WEB_BASE_URL=http://localhost:8088`, or its `https://….ts.net` name). Then `serve.mjs` is not started,
+  `multiplayer.spec.mjs` starts no local relay and lets the pages use `/ws` on their own origin, and the specs that
+  need `/__fixtures/` get them from this folder through `fixtures/remote.mjs` (a `context.route`), since a real
+  deployment doesn't serve them.
+
 `bootToMenu(page)` loads the page, clicks `#yarg-start` and waits for the `Main menu ready` console line. It fails
 on an error screen (`#yarg-error`) or on any `console.error` that contains `Exception`.
 

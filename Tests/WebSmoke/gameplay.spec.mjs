@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import { buildSongFixtures } from './fixtures/make-song.mjs';
 import { loadPure } from '../WebAudio/load.mjs';
 import { dismissAntiPiracyDialog } from './fixtures/dialogs.mjs';
+import { routeFixtures } from './fixtures/remote.mjs';
 
 const pure = loadPure();
 const FIXTURES = '/__fixtures/song-build/';
@@ -17,6 +18,7 @@ const MIN_PEAK = 0.1;
 
 test.setTimeout(300_000);
 test.beforeAll(() => buildSongFixtures());
+test.beforeEach(({ context }) => routeFixtures(context));
 
 function collectLogs(page) {
   const lines = [];
