@@ -40,7 +40,8 @@ Never deploy a `-webDev` build; the normal build (no flag) is the release one.
 
 Plays a match between two pages (separate browser contexts, so separate `localStorage`) through a local relay. It
 starts `Server/YARG.Relay` with `dotnet run` on `YARG_RELAY_PORT` (default `8090`) and passes `?relay=ws://…` to
-both pages, which run the in-game autotest:
+both pages, which run the in-game autotest (only in test builds, `-webDev` or `-webTestHooks`, which define
+`YARG_WEB_TEST_HOOKS`; a release build accepts only `-lang`, `-offline` and `-relay`):
 
 - host: `?mp-autotest=webhost&mp-room=SmokeRoom&mp-password=…&mp-players=2&mp-profile=Host&mp-bot=1`
 - client: `?mp-autotest=webjoin&mp-room=SmokeRoom&mp-password=…&mp-wrong-password=errada&mp-profile=Cliente&mp-bot=1`

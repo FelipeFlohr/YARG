@@ -35,7 +35,7 @@ namespace YARG.Multiplayer
     /// game quits when the run is over ("[AutoTest] PASS" or "[AutoTest] FAIL ...").
     /// On the web, <c>-mp-autotest webhost</c> creates the relay room <c>-mp-room name</c> with <c>-mp-password p</c>
     /// and plays the song loaded into the page, and <c>-mp-autotest webjoin</c> joins that room by name, first trying
-    /// <c>-mp-wrong-password p</c> (which must be refused) when given. The relay is <c>-relay url</c> or the page's origin.
+    /// <c>-mp-wrong-password p</c> (which must be refused) when given. Both exist only in builds with <c>YARG_WEB_TEST_HOOKS</c>. The relay is <c>-relay url</c> or the page's origin.
     /// </summary>
     public static class MultiplayerAutoTest
     {
@@ -162,11 +162,13 @@ namespace YARG.Multiplayer
                 {
                     "host"    => await RunHost(() => UniTask.FromResult(MultiplayerManager.Instance.Host()),
                         () => FindLibrarySong(GetArg(args, "-mp-song", "")), rounds, players),
+                    "offline" => await RunOffline(GetArg(args, "-mp-song", ""), int.Parse(address)),
+#if YARG_WEB_TEST_HOOKS
                     "webhost" => await RunHost(() => CreateWebRoom(room, password, players), WaitForWebSong, rounds,
                         players),
-                    "offline" => await RunOffline(GetArg(args, "-mp-song", ""), int.Parse(address)),
                     "webjoin" => await RunClient(
                         () => JoinWebRoom(room, password, GetArg(args, "-mp-wrong-password", null)), room),
+#endif
                     _         => await RunClient(() => UniTask.FromResult(MultiplayerManager.Instance.Join(address)),
                         address),
                 };
@@ -555,6 +557,8 @@ namespace YARG.Multiplayer
             return UniTask.FromResult(song);
         }
 
+#if YARG_WEB_TEST_HOOKS
+        // Only test builds of the web accept the -mp-* page arguments
         /// <summary>
         /// The web has no library: the song is the one loaded into the page (the smoke test calls
         /// <c>window.yargTest.loadSongFromUrl</c>, the player would use "Choose Song...").
@@ -645,6 +649,7 @@ namespace YARG.Multiplayer
             MultiplayerManager.Instance.JoinWeb(transport);
             return true;
         }
+#endif
 
         private static async UniTask<bool> RunHost(Func<UniTask<bool>> startHosting, Func<UniTask<SongEntry>> findSong,
             int rounds, int players)
