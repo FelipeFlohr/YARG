@@ -63,6 +63,15 @@
           }
         });
 
+        // F3 sits next to the 1-5 fret keys, and the browser's find bar it opens steals the
+        // keyboard mid-song. Only the browser default is cancelled; Unity still gets the key.
+        window.addEventListener("keydown", function (e) {
+          var key = (e.key || "").toLowerCase();
+          if (key === "f3" || ((e.ctrlKey || e.metaKey) && (key === "f" || key === "g"))) {
+            e.preventDefault();
+          }
+        }, true);
+
         window.addEventListener("error", function (e) {
           var message = (e && e.message) ? String(e.message) : "";
           if (message.toLowerCase().indexOf("memory") >= 0) {
